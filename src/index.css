@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: var(--color-primary, #2563eb);
+}
+
+@layer base {
+  :root {
+    --color-primary: #2563eb; /* blue-600 */
+  }
+  
+  .dark {
+    color-scheme: dark;
+  }
+  
+  .dark body {
+    background-color: #18181b; /* zinc-900 */
+    color: #f4f4f5; /* zinc-50 */
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
