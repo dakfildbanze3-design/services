@@ -186,6 +186,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [currentView, setCurrentView] = useState<'marketplace' | 'bookings' | 'profile' | 'messages' | 'create-service' | 'create-post' | 'verification' | 'chat-detail' | 'service-detail' | 'notifications' | 'public-profile' | 'login' | 'register' | 'settings' | 'help' | 'terms' | 'find-people'>('marketplace');
   const [isLoading, setIsLoading] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [loginErrorMessage, setLoginErrorMessage] = useState<string | null>(null);
   const isFetchingRef = useRef(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -724,7 +725,7 @@ export default function App() {
   };
 
   const handleLogin = async (email?: string) => {
-    setIsLoading(true);
+    setIsAuthLoading(true);
     setLoginErrorMessage(null);
     try {
       if (email) {
@@ -743,12 +744,12 @@ export default function App() {
         setLoginErrorMessage(error.message || "Erro ao entrar.");
       }
     } finally {
-      setIsLoading(false);
+      setIsAuthLoading(false);
     }
   };
 
   const handleRegister = async (name: string, email: string, avatarFile: File | null) => {
-    setIsLoading(true);
+    setIsAuthLoading(true);
     setLoginErrorMessage(null);
     try {
       if (avatarFile) {
@@ -779,7 +780,7 @@ export default function App() {
         setLoginErrorMessage(error.message || "Erro ao cadastrar.");
       }
     } finally {
-      setIsLoading(false);
+      setIsAuthLoading(false);
     }
   };
 
@@ -976,7 +977,7 @@ export default function App() {
                 backgroundImage={services[0]?.images[0]}
                 onLogin={handleLogin}
                 onSwitchToRegister={() => setCurrentView('register')}
-                isLoading={isLoading}
+                isLoading={isAuthLoading}
                 errorMessage={loginErrorMessage}
               />
             )}
@@ -987,7 +988,7 @@ export default function App() {
                 onRegister={handleRegister}
                 onSwitchToLogin={() => setCurrentView('login')}
                 onLoginWithGoogle={() => handleLogin()}
-                isLoading={isLoading}
+                isLoading={isAuthLoading}
                 errorMessage={loginErrorMessage}
               />
             )}
