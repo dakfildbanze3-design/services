@@ -150,7 +150,7 @@ export default function BookingModal({ service, onClose, onSuccess }: BookingMod
             <h2 className="text-lg font-bold text-zinc-900">Reservar Serviço</h2>
             <p className="text-xs text-zinc-500">{service.title} • {new Intl.NumberFormat('pt-MZ', { style: 'currency', currency: 'MZN' }).format(service.price)}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
+          <button onClick={onClose} className="p-1.5 hover:bg-zinc-100 rounded-[3px] transition-colors">
             <X className="w-5 h-5 text-zinc-400" />
           </button>
         </div>
@@ -232,7 +232,7 @@ export default function BookingModal({ service, onClose, onSuccess }: BookingMod
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Ex: Minha torneira está vazando muito..."
-                    className="w-full h-24 pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-100 rounded-[3px] text-sm outline-none focus:border-zinc-900 transition-colors resize-none"
+                    className="w-full h-24 pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-100 rounded-[3px] text-sm outline-none focus:border-zinc-900 transition-colors resize-none"
                   />
                 </div>
               </div>
@@ -246,7 +246,7 @@ export default function BookingModal({ service, onClose, onSuccess }: BookingMod
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="Rua, número, bairro..."
-                    className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm outline-none focus:border-zinc-900 transition-colors"
+                    className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-100 rounded-[3px] text-sm outline-none focus:border-zinc-900 transition-colors"
                   />
                 </div>
               </div>
@@ -260,7 +260,7 @@ export default function BookingModal({ service, onClose, onSuccess }: BookingMod
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="(00) 00000-0000"
-                    className="w-full pl-10 pr-4 py-3 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm outline-none focus:border-zinc-900 transition-colors"
+                    className="w-full pl-10 pr-4 py-2 bg-zinc-50 border border-zinc-100 rounded-[3px] text-sm outline-none focus:border-zinc-900 transition-colors"
                   />
                 </div>
               </div>
@@ -314,7 +314,7 @@ export default function BookingModal({ service, onClose, onSuccess }: BookingMod
           {step > 1 && (
             <button 
               onClick={() => setStep(step - 1)}
-              className="flex-1 py-4 bg-white border border-zinc-200 text-zinc-700 font-bold rounded-[3px] hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
+              className="flex-1 py-2.5 bg-white border border-zinc-200 text-zinc-700 font-bold rounded-[3px] hover:bg-zinc-50 transition-colors flex items-center justify-center gap-2"
             >
               <ChevronLeft className="w-4 h-4" /> Voltar
             </button>
@@ -326,10 +326,10 @@ export default function BookingModal({ service, onClose, onSuccess }: BookingMod
               if (step < 3) setStep(step + 1);
               else handleConfirm();
             }}
-            className="flex-[2] py-4 bg-zinc-900 text-white font-bold rounded-[3px] hover:bg-zinc-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-[2] py-2.5 bg-zinc-900 text-white font-bold rounded-[3px] hover:bg-zinc-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : step === 3 ? (
               <>Confirmar Reserva</>
             ) : (

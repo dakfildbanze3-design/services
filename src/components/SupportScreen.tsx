@@ -134,7 +134,7 @@ export default function SupportScreen({ onBack }: SupportScreenProps) {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-lg text-white font-bold text-sm ${message.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}
+            className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-[3px] shadow-lg text-white font-bold text-sm ${message.type === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`}
           >
             {message.text}
           </motion.div>

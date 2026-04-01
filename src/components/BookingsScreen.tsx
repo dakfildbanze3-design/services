@@ -113,25 +113,25 @@ export default function BookingsScreen({ onBack }: BookingsScreenProps) {
     switch (status) {
       case 'pending':
         return (
-          <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold border border-amber-100">
+          <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-600 rounded-[3px] text-[10px] font-bold border border-amber-100">
             <Clock3 className="w-3 h-3" /> Pendente
           </div>
         );
       case 'accepted':
         return (
-          <div className="flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold border border-emerald-100">
+          <div className="flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-600 rounded-[3px] text-[10px] font-bold border border-emerald-100">
             <CheckCircle2 className="w-3 h-3" /> Aceito
           </div>
         );
       case 'rejected':
         return (
-          <div className="flex items-center gap-1 px-2 py-1 bg-rose-50 text-rose-600 rounded-full text-[10px] font-bold border border-rose-100">
+          <div className="flex items-center gap-1 px-2 py-1 bg-rose-50 text-rose-600 rounded-[3px] text-[10px] font-bold border border-rose-100">
             <XCircle className="w-3 h-3" /> Recusado
           </div>
         );
       case 'cancelled':
         return (
-          <div className="flex items-center gap-1 px-2 py-1 bg-zinc-100 text-zinc-500 rounded-full text-[10px] font-bold border border-zinc-200">
+          <div className="flex items-center gap-1 px-2 py-1 bg-zinc-100 text-zinc-500 rounded-[3px] text-[10px] font-bold border border-zinc-200">
             <XCircle className="w-3 h-3" /> Cancelado
           </div>
         );
@@ -224,7 +224,7 @@ export default function BookingsScreen({ onBack }: BookingsScreenProps) {
     <div className="min-h-screen bg-zinc-50 pb-24">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-zinc-200 px-4 py-4 flex items-center gap-4">
-        <button onClick={onBack} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
+        <button onClick={onBack} className="p-1.5 hover:bg-zinc-100 rounded-[3px] transition-colors">
           <ArrowLeft className="w-6 h-6 text-zinc-800" />
         </button>
         <h1 className="text-xl font-bold text-zinc-900">Minhas Reservas</h1>
@@ -237,14 +237,14 @@ export default function BookingsScreen({ onBack }: BookingsScreenProps) {
           className={`py-4 text-xs font-bold uppercase tracking-widest transition-all relative ${activeTab === 'client' ? 'text-zinc-900' : 'text-zinc-400'}`}
         >
           Minhas Reservas
-          {activeTab === 'client' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-900 rounded-t-full" />}
+          {activeTab === 'client' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-900 rounded-t-[3px]" />}
         </button>
         <button 
           onClick={() => setActiveTab('provider')}
           className={`py-4 text-xs font-bold uppercase tracking-widest transition-all relative ${activeTab === 'provider' ? 'text-zinc-900' : 'text-zinc-400'}`}
         >
           Recebidas
-          {activeTab === 'provider' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-900 rounded-t-full" />}
+          {activeTab === 'provider' && <motion.div layoutId="tab" className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-900 rounded-t-[3px]" />}
         </button>
       </div>
 
@@ -263,7 +263,7 @@ export default function BookingsScreen({ onBack }: BookingsScreenProps) {
                 ))
               ) : (
                 <div className="text-center py-20 space-y-4">
-                  <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center mx-auto shadow-sm border border-zinc-100">
+                  <div className="w-16 h-16 bg-white rounded-[3px] flex items-center justify-center mx-auto shadow-sm border border-zinc-100">
                     <Calendar className="w-8 h-8 text-zinc-200" />
                   </div>
                   <p className="text-sm text-zinc-400 font-medium">Você ainda não fez nenhuma reserva.</p>
@@ -276,7 +276,7 @@ export default function BookingsScreen({ onBack }: BookingsScreenProps) {
                 ))
               ) : (
                 <div className="text-center py-20 space-y-4">
-                  <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center mx-auto shadow-sm border border-zinc-100">
+                  <div className="w-16 h-16 bg-white rounded-[3px] flex items-center justify-center mx-auto shadow-sm border border-zinc-100">
                     <Clock3 className="w-8 h-8 text-zinc-200" />
                   </div>
                   <p className="text-sm text-zinc-400 font-medium">Nenhuma reserva recebida ainda.</p>
