@@ -220,6 +220,7 @@ const NavItem = ({ icon: Icon, label, active, onClick }: any) => (
 
 const PostCard: React.FC<{ post: Post, onLike: (id: string) => void | Promise<void>, onComment: (post: Post) => void, onProfileClick: (id: string) => void, onPostClick?: (post: Post) => void, isDetail?: boolean }> = ({ post, onLike, onComment, onProfileClick, onPostClick, isDetail }) => {
   const [isExpanded, setIsExpanded] = useState(isDetail || false);
+  const [showOptions, setShowOptions] = useState(false);
   const authorName = post.profiles?.name || 'Usuário';
   const authorAvatar = post.profiles?.photoUrl || `https://ui-avatars.com/api/?name=${authorName}`;
   const isLongDescription = post.description && post.description.length > 200;
@@ -227,7 +228,7 @@ const PostCard: React.FC<{ post: Post, onLike: (id: string) => void | Promise<vo
   return (
     <div className="bg-white border-b-[2.5px] border-[#D1D5DB]">
       {/* Header - Minimalist on white */}
-      <div className="p-4 flex items-center justify-between">
+      <div className="p-4 flex items-center justify-between relative">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => onProfileClick(post.user_id)}>
           <img 
             src={authorAvatar} 
@@ -253,11 +254,39 @@ const PostCard: React.FC<{ post: Post, onLike: (id: string) => void | Promise<vo
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <span className="text-[10px] font-black text-gray-900 uppercase tracking-tighter">{post.title}</span>
-          <button className="text-gray-400 p-1">
-            <MoreVertical size={16} />
-          </button>
+          <div className="relative">
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowOptions(!showOptions); }}
+              className="text-gray-400 p-1 hover:bg-gray-50 rounded-[3px] transition-colors"
+            >
+              <MoreVertical size={18} strokeWidth={3} />
+            </button>
+
+            {/* Options Dropdown */}
+            {showOptions && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowOptions(false)}
+                />
+                <div className="absolute right-0 mt-2 w-40 bg-white border border-[#D1D5DB] rounded-[3px] shadow-xl z-50 animate-in fade-in zoom-in-95 duration-200">
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setShowOptions(false);
+                      /* Handle report logic */
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <AlertTriangle size={16} strokeWidth={3} />
+                    <span className="text-xs font-black uppercase tracking-widest">Denunciar</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -814,7 +843,15 @@ export default function App() {
   const [showBookingModal, setShowBookingModal] = useState<Post | null>(null);
   const [showSideMenu, setShowSideMenu] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const authInitialized = useRef(false);
+
+  useEffect(() => {
+    if (activeCategory === 'find' && view === 'category-view') {
+      setTimeout(() => searchInputRef.current?.focus(), 100);
+    }
+  }, [activeCategory, view]);
   const fetchingProfileId = useRef<string | null>(null);
 
   const categories = [
@@ -1250,12 +1287,12 @@ export default function App() {
             {/* Categories Bar */}
             <div className="py-2 bg-white">
               <div className="px-4 flex items-center justify-between">
-                <div className="flex items-center w-full justify-between">
+                <div className="flex items-center w-full justify-between overflow-x-auto no-scrollbar gap-4">
                   {categories.map((cat) => (
                     <button 
                       key={cat.id} 
-                      onClick={() => { setActiveCategory(cat.id); setView('category-view'); }}
-                      className="flex flex-col items-center gap-1 transition-transform active:scale-95"
+                      onClick={() => { setActiveCategory(cat.id); setView('category-view'); setSearchQuery(''); }}
+                      className="flex flex-col items-center gap-1 transition-transform active:scale-95 flex-shrink-0"
                     >
                       <div className={cn(
                         "w-11 h-11 flex items-center justify-center rounded-[14px] transition-all duration-300",
@@ -1338,25 +1375,74 @@ export default function App() {
 
         {view === 'category-view' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 bg-white min-h-screen">
-            <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b-[2.5px] border-[#D1D5DB] px-4 py-4 flex items-center gap-4">
-              <button 
-                onClick={() => setView('feed')}
-                className="w-10 h-10 flex items-center justify-center text-black hover:bg-gray-100 rounded-[12px] transition-colors"
-              >
-                <ArrowLeft size={20} strokeWidth={3} />
-              </button>
-              <div>
-                <h2 className="text-xl font-black text-gray-900 tracking-tight">
-                  {categories.find(c => c.id === activeCategory)?.name || 'Explorar'}
-                </h2>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  {posts.filter(p => p.category === activeCategory || activeCategory === 'all').length} resultados
-                </p>
+            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b-[2.5px] border-[#D1D5DB] shadow-sm">
+              {/* Search Bar */}
+              <div className="px-4 pt-4 pb-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Pesquisar serviços, profissionais..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-gray-100 border-none rounded-[10px] py-2.5 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Categories Bar in Category View */}
+              <div className="py-3 bg-white">
+                <div className="px-4 flex items-center justify-between">
+                  <div className="flex items-center w-full justify-between overflow-x-auto no-scrollbar gap-4">
+                    {categories.map((cat) => (
+                      <button 
+                        key={cat.id} 
+                        onClick={() => { setActiveCategory(cat.id); setSearchQuery(''); }}
+                        className="flex flex-col items-center gap-1 transition-transform active:scale-95 flex-shrink-0"
+                      >
+                        <div className={cn(
+                          "w-11 h-11 flex items-center justify-center rounded-[14px] transition-all duration-300",
+                          activeCategory === cat.id 
+                            ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
+                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        )}>
+                          <cat.icon 
+                            size={22} 
+                            strokeWidth={3} 
+                          />
+                        </div>
+                        <span className={cn(
+                          "text-[10px] font-bold transition-colors",
+                          activeCategory === cat.id ? "text-blue-600" : "text-gray-400"
+                        )}>
+                          {cat.name}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
             
             <div className="space-y-0">
-              {posts.filter(p => p.category === activeCategory || activeCategory === 'all').map(post => (
+              {posts.filter(p => {
+                const matchesCategory = p.category === activeCategory || activeCategory === 'all' || activeCategory === 'find';
+                const matchesSearch = !searchQuery || 
+                  p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  p.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (p.profiles?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+                return matchesCategory && matchesSearch;
+              }).map(post => (
                 <PostCard 
                   key={post.id} 
                   post={post} 
@@ -1366,17 +1452,25 @@ export default function App() {
                   onProfileClick={(id) => { setSelectedProfileId(id); setView('public-profile'); }}
                 />
               ))}
-              {posts.filter(p => p.category === activeCategory || activeCategory === 'all').length === 0 && (
+              {posts.filter(p => {
+                const matchesCategory = p.category === activeCategory || activeCategory === 'all' || activeCategory === 'find';
+                const matchesSearch = !searchQuery || 
+                  p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  p.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (p.profiles?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+                return matchesCategory && matchesSearch;
+              }).length === 0 && (
                 <div className="p-12 text-center">
                   <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Search className="text-gray-300" size={32} />
                   </div>
-                  <p className="text-gray-500 font-bold text-sm">Nenhum serviço encontrado nesta categoria.</p>
+                  <p className="text-gray-500 font-bold text-sm">Nenhum resultado encontrado para sua busca.</p>
                   <button 
-                    onClick={() => setView('feed')}
+                    onClick={() => { setSearchQuery(''); setActiveCategory('all'); }}
                     className="mt-4 text-blue-600 text-xs font-black uppercase tracking-widest"
                   >
-                    Voltar ao Início
+                    Limpar Filtros
                   </button>
                 </div>
               )}
