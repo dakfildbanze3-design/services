@@ -845,8 +845,21 @@ export default function App() {
   const [showSideMenu, setShowSideMenu] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [envError, setEnvError] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const authInitialized = useRef(false);
+
+  useEffect(() => {
+    // Check for required environment variables
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      setEnvError('As variáveis de ambiente do Supabase estão faltando. Por favor, configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.');
+      setLoading(false);
+      return;
+    }
+  }, []);
 
   useEffect(() => {
     if (activeCategory === 'find' && view === 'category-view') {
@@ -1136,6 +1149,21 @@ export default function App() {
   const handleAuthComplete = React.useCallback(() => setView('feed'), []);
 
   if (view === 'splash') return <SplashScreen onComplete={handleSplashComplete} />;
+
+  if (envError) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
+        <AlertTriangle size={48} className="text-red-500 mb-4" />
+        <h1 className="text-xl font-bold text-gray-900 mb-2">Erro de Configuração</h1>
+        <p className="text-gray-600 text-sm max-w-xs">
+          {envError}
+        </p>
+        <div className="mt-6 p-4 bg-gray-50 rounded-[3px] text-left text-[10px] font-mono text-gray-500 border border-gray-200">
+          Dica: No GitHub/Vercel/Netlify, adicione as variáveis de ambiente nas configurações do projeto.
+        </div>
+      </div>
+    );
+  }
 
   if (loading) return <LoadingOverlay />;
 
