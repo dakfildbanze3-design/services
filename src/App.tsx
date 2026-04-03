@@ -337,38 +337,36 @@ const PostCard: React.FC<{ post: Post, onLike: (id: string) => void | Promise<vo
         </div>
       </div>
 
-      {/* Follow Button - Below image, right aligned */}
-      <div className="mt-2 px-4 flex justify-end">
+      {/* Description and Follow Button - Side by side */}
+      <div className="px-4 pt-2 pb-4 flex items-start gap-4">
+        <div className="flex-1">
+          <p 
+            className={cn(
+              "text-xs text-gray-900 font-medium leading-relaxed",
+              !isExpanded && "line-clamp-4",
+              onPostClick && "cursor-pointer"
+            )}
+            onClick={() => onPostClick?.(post)}
+          >
+            {post.description}
+          </p>
+          {isLongDescription && !isExpanded && (
+            <div className="mt-1">
+              <button 
+                onClick={() => setIsExpanded(true)}
+                className="text-gray-500 text-[10px] font-bold"
+              >
+                ...ver mais
+              </button>
+            </div>
+          )}
+        </div>
         <button 
-          className="bg-blue-600 text-white text-[10px] font-bold px-4 py-1.5 rounded-[3px] active:scale-95 transition-transform shadow-sm"
+          className="flex-shrink-0 bg-blue-600 text-white text-[10px] font-bold px-4 py-1.5 rounded-[3px] active:scale-95 transition-transform shadow-sm mt-0.5"
           onClick={(e) => { e.stopPropagation(); }}
         >
           Seguir
         </button>
-      </div>
-
-      {/* Description Only */}
-      <div className="px-4 pt-[4px] pb-4">
-        <p 
-          className={cn(
-            "text-xs text-gray-900 font-medium leading-relaxed",
-            !isExpanded && "line-clamp-4",
-            onPostClick && "cursor-pointer"
-          )}
-          onClick={() => onPostClick?.(post)}
-        >
-          {post.description}
-        </p>
-        {isLongDescription && !isExpanded && (
-          <div className="mt-1">
-            <button 
-              onClick={() => setIsExpanded(true)}
-              className="text-gray-500 text-[10px] font-bold"
-            >
-              ...ver mais
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -517,13 +515,13 @@ const CommentsView = ({ post, onClose, userProfile }: { post: Post, onClose: () 
           comments.map(comment => (
             <div key={comment.id} className="flex gap-3">
               <img 
-                src={comment.profiles.photoUrl || `https://ui-avatars.com/api/?name=${comment.profiles.name}`} 
+                src={comment.profiles?.photoUrl || `https://ui-avatars.com/api/?name=${comment.profiles?.name || 'Usuario'}`} 
                 className="w-8 h-8 rounded-[3px] object-cover"
-                alt={comment.profiles.name}
+                alt={comment.profiles?.name || 'Usuario'}
               />
               <div className="flex-1">
                 <div className="bg-gray-50 p-3 rounded-[3px] rounded-tl-none border border-gray-100">
-                  <h4 className="text-xs font-bold text-gray-900 mb-1">{comment.profiles.name}</h4>
+                  <h4 className="text-xs font-bold text-gray-900 mb-1">{comment.profiles?.name || 'Usuario'}</h4>
                   <p className="text-sm text-gray-700 font-medium">{comment.content}</p>
                 </div>
                 <div className="flex items-center gap-4 mt-1.5 ml-1">
@@ -582,7 +580,7 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
       try {
         const { data, error } = await supabase
           .from('services')
-          .select('*, profiles(*)')
+          .select('*, profiles!provider(*)')
           .eq('category', post.category)
           .neq('id', post.id)
           .limit(5);
@@ -846,6 +844,7 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [envError, setEnvError] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const authInitialized = useRef(false);
 
@@ -1047,6 +1046,7 @@ export default function App() {
 
   const fetchPosts = async () => {
     try {
+      setConnectionError(null);
       const { data, error } = await supabase
         .from('posts')
         .select('*, profiles(*)')
@@ -1070,8 +1070,11 @@ export default function App() {
       } else {
         setPosts(data || []);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching posts:', err);
+      if (err.message === 'Failed to fetch') {
+        setConnectionError('Não foi possível conectar ao servidor. Verifique sua conexão com a internet ou as variáveis de ambiente.');
+      }
     }
   };
 
@@ -1079,7 +1082,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from('services')
-        .select('*, profiles!provider_id(*)')
+        .select('*, profiles!provider(*)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -1150,17 +1153,23 @@ export default function App() {
 
   if (view === 'splash') return <SplashScreen onComplete={handleSplashComplete} />;
 
-  if (envError) {
+  if (envError || connectionError) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
         <AlertTriangle size={48} className="text-red-500 mb-4" />
-        <h1 className="text-xl font-bold text-gray-900 mb-2">Erro de Configuração</h1>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">Erro de Conexão</h1>
         <p className="text-gray-600 text-sm max-w-xs">
-          {envError}
+          {envError || connectionError}
         </p>
         <div className="mt-6 p-4 bg-gray-50 rounded-[3px] text-left text-[10px] font-mono text-gray-500 border border-gray-200">
           Dica: No GitHub/Vercel/Netlify, adicione as variáveis de ambiente nas configurações do projeto.
         </div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-[3px] font-bold text-sm"
+        >
+          Tentar Novamente
+        </button>
       </div>
     );
   }
@@ -2564,9 +2573,9 @@ const ExploreView = ({ professionals }: { professionals: Profile[] }) => (
               <div className="bg-white p-4 rounded-[3px] border border-gray-100 flex items-center gap-4 shadow-sm">
                 <div className="relative">
                   <img 
-                    src={prof.photoUrl || `https://ui-avatars.com/api/?name=${prof.name}`} 
+                    src={prof?.photoUrl || `https://ui-avatars.com/api/?name=${prof?.name || 'Profissional'}`} 
                     className="w-16 h-16 rounded-[3px] object-cover" 
-                    alt={prof.name} 
+                    alt={prof?.name || 'Profissional'} 
                   />
                   {prof.verified && (
                     <div className="absolute -bottom-1 -right-1 bg-white rounded-[3px] p-1 shadow-sm border border-gray-50">
