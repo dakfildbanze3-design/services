@@ -307,8 +307,8 @@ const PostCard: React.FC<{ post: Post, onLike: (id: string) => void | Promise<vo
         </div>
       </div>
 
-      {/* Follow Button - Right after image with 4px separation */}
-      <div className="mt-[4px] px-4 flex justify-end">
+      {/* Follow Button - Below image, right aligned */}
+      <div className="mt-2 px-4 flex justify-end">
         <button 
           className="bg-blue-600 text-white text-[10px] font-bold px-4 py-1.5 rounded-[3px] active:scale-95 transition-transform shadow-sm"
           onClick={(e) => { e.stopPropagation(); }}
@@ -1190,21 +1190,27 @@ export default function App() {
                   <span className="text-sm font-medium">Definições</span>
                 </button>
                 <button 
-                  onClick={() => { setView('support'); setShowSideMenu(false); }}
+                  onClick={() => { 
+                    window.open('https://wa.me/855767005?text=Olá,%20gostaria%20de%20suporte%20no%20aplicativo%20Serviços.', '_blank');
+                    setShowSideMenu(false); 
+                  }}
                   className="w-full flex items-center gap-4 p-3 rounded-[3px] hover:bg-gray-50 transition-colors text-gray-700"
                 >
                   <LifeBuoy size={18} className="text-gray-400" />
                   <span className="text-sm font-medium">Suporte</span>
                 </button>
                 <button 
-                  onClick={() => { setView('support'); setShowSideMenu(false); }}
+                  onClick={() => { 
+                    window.open('https://wa.me/855767005?text=Olá,%20gostaria%20de%20ajuda%20no%20aplicativo%20Serviços.', '_blank');
+                    setShowSideMenu(false); 
+                  }}
                   className="w-full flex items-center gap-4 p-3 rounded-[3px] hover:bg-gray-50 transition-colors text-gray-700"
                 >
                   <HelpCircle size={18} className="text-gray-400" />
                   <span className="text-sm font-medium">Ajuda</span>
                 </button>
                 <button 
-                  onClick={() => { setView('support'); setShowSideMenu(false); }}
+                  onClick={() => { setView('terms'); setShowSideMenu(false); }}
                   className="w-full flex items-center gap-4 p-3 rounded-[3px] hover:bg-gray-50 transition-colors text-gray-700"
                 >
                   <FileText size={18} className="text-gray-400" />
@@ -1426,6 +1432,7 @@ export default function App() {
           />
         )}
         {view === 'settings' && <SettingsScreen onBack={handleBackToProfile} />}
+        {view === 'terms' && <TermsView onBack={() => setView('feed')} />}
       </main>
 
       {/* Bottom Navigation */}
@@ -2849,6 +2856,56 @@ const ReservationsView = ({ userProfile }: { userProfile: Profile | null }) => {
         )) : (
           <p className="text-sm text-gray-500 text-center py-8">Você ainda não tem reservas.</p>
         )}
+      </div>
+    </div>
+  );
+};
+
+const TermsView = ({ onBack }: { onBack: () => void }) => {
+  return (
+    <div className="min-h-screen bg-white animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b-[2.5px] border-[#D1D5DB] px-4 py-4 flex items-center gap-4">
+        <button 
+          onClick={onBack}
+          className="w-10 h-10 flex items-center justify-center text-black hover:bg-gray-100 rounded-[12px] transition-colors"
+        >
+          <ArrowLeft size={20} strokeWidth={3} />
+        </button>
+        <h2 className="text-xl font-black text-gray-900 tracking-tight">Termos e Condições</h2>
+      </div>
+
+      <div className="p-6 space-y-8 max-w-2xl mx-auto">
+        <section>
+          <h3 className="text-lg font-black text-blue-600 mb-3 uppercase tracking-tighter">1. Aceitação dos Termos</h3>
+          <p className="text-sm text-gray-600 leading-relaxed font-medium">
+            Ao utilizar a plataforma <span className="font-bold text-gray-900">Serviços</span>, você concorda integralmente com as diretrizes aqui estabelecidas. Este ecossistema foi projetado para fomentar conexões profissionais seguras e eficientes entre prestadores e clientes.
+          </p>
+        </section>
+
+        <section>
+          <h3 className="text-lg font-black text-blue-600 mb-3 uppercase tracking-tighter">2. Responsabilidade Profissional</h3>
+          <p className="text-sm text-gray-600 leading-relaxed font-medium">
+            Os prestadores de serviços cadastrados assumem total responsabilidade técnica e ética pelas atividades desempenhadas. A plataforma atua como facilitadora de visibilidade, não garantindo resultados específicos, mas promovendo a transparência através de avaliações reais.
+          </p>
+        </section>
+
+        <section>
+          <h3 className="text-lg font-black text-blue-600 mb-3 uppercase tracking-tighter">3. Privacidade e Dados</h3>
+          <p className="text-sm text-gray-600 leading-relaxed font-medium">
+            Seus dados são tratados com o mais alto rigor de segurança. Utilizamos criptografia de ponta para proteger informações sensíveis e garantimos que sua privacidade é nossa prioridade absoluta. Nunca compartilhamos dados com terceiros sem consentimento explícito.
+          </p>
+        </section>
+
+        <section>
+          <h3 className="text-lg font-black text-blue-600 mb-3 uppercase tracking-tighter">4. Conduta na Comunidade</h3>
+          <p className="text-sm text-gray-600 leading-relaxed font-medium">
+            Prezamos pelo respeito mútuo. Comportamentos abusivos, spam ou tentativas de fraude resultarão no banimento imediato e permanente da conta, visando preservar a integridade e a qualidade da nossa rede profissional.
+          </p>
+        </section>
+
+        <div className="pt-8 border-t border-gray-100 italic text-[10px] text-gray-400 text-center">
+          Última atualização: Abril de 2026. Todos os direitos reservados à plataforma Serviços.
+        </div>
       </div>
     </div>
   );
