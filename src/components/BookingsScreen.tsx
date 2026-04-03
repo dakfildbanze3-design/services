@@ -1,3 +1,4 @@
+// Bookings Screen Component
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
