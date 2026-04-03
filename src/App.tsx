@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Search, 
   Home, 
@@ -222,113 +222,124 @@ const PostCard: React.FC<{ post: Post, onLike: (id: string) => void | Promise<vo
   const [isExpanded, setIsExpanded] = useState(isDetail || false);
   const authorName = post.profiles?.name || 'Usuário';
   const authorAvatar = post.profiles?.photoUrl || `https://ui-avatars.com/api/?name=${authorName}`;
-  const isLongDescription = post.description && post.description.length > 120;
+  const isLongDescription = post.description && post.description.length > 200;
 
   return (
-    <div className="bg-white">
+    <div className="bg-white border-b-[2.5px] border-[#D1D5DB]">
+      {/* Header - Minimalist on white */}
       <div className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4 cursor-pointer" onClick={() => onProfileClick(post.user_id)}>
-          <div className="relative">
-            <img 
-              src={authorAvatar} 
-              className="w-[30px] h-[30px] rounded-[3px] object-cover"
-              alt={authorName}
-            />
-          </div>
+        <div className="flex items-center gap-3 cursor-pointer" onClick={() => onProfileClick(post.user_id)}>
+          <img 
+            src={authorAvatar} 
+            className="w-[40px] h-[40px] rounded-[3px] object-cover border border-[#D1D5DB]"
+            alt={authorName}
+          />
           <div>
             <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
               {authorName}
-              {post.profiles?.verified && <CheckCircle2 size={14} className="text-blue-500 fill-blue-500" />}
+              {post.profiles?.verified && <CheckCircle2 size={12} className="text-blue-500 fill-blue-500" />}
             </h3>
-            <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-medium mt-0.5">
-              <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: ptBR })}</span>
-              <span className="w-1 h-1 bg-gray-300 rounded-[3px]"></span>
-              <span className="flex items-center gap-0.5"><MapPin size={10} /> {post.profiles?.location || 'Brasil'}</span>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[9px] text-gray-500 font-medium">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: ptBR })}</p>
+              {post.location && (
+                <>
+                  <span className="w-0.5 h-0.5 bg-gray-300 rounded-full"></span>
+                  <p className="text-[9px] text-gray-500 font-bold flex items-center gap-0.5">
+                    <MapPin size={8} />
+                    {post.location}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-[3px] hover:bg-blue-100 transition-colors active:scale-95">
-            Seguir
-          </button>
-          <button className="text-gray-400 p-1.5 hover:bg-gray-50 rounded-[3px] transition-colors">
-            <MoreVertical size={18} />
+          <span className="text-[10px] font-black text-gray-900 uppercase tracking-tighter">{post.title}</span>
+          <button className="text-gray-400 p-1">
+            <MoreVertical size={16} />
           </button>
         </div>
       </div>
 
-      {post.image_url && (
-        <div 
-          className={cn("w-full bg-gray-50", onPostClick && "cursor-pointer")} 
-          onClick={() => onPostClick?.(post)}
-        >
-          <img 
-            src={post.image_url} 
-            className="w-full h-auto object-contain max-h-[600px]" 
-            alt={post.title}
-          />
-        </div>
-      )}
+      {/* Image with Vertical Actions */}
+      <div className="relative group">
+        {post.image_url && (
+          <div 
+            className={cn("w-full bg-gray-50 flex items-center justify-center", onPostClick && "cursor-pointer")} 
+            onClick={() => onPostClick?.(post)}
+          >
+            <img 
+              src={post.image_url} 
+              className="w-full h-auto object-contain max-h-[500px]" 
+              alt={post.title}
+            />
+          </div>
+        )}
 
-      <div className="p-4 pb-0">
-        <div className="flex items-center gap-4 mb-4">
+        {/* Vertical Actions Overlay - Adaptive using mix-blend-mode */}
+        <div className="absolute right-3 bottom-6 flex flex-col items-center gap-5 z-10 mix-blend-difference">
           <button 
-            onClick={() => onLike(post.id)}
+            onClick={(e) => { e.stopPropagation(); onLike(post.id); }}
             className={cn(
-              "flex items-center gap-1.5 transition-all active:scale-95",
-              post.has_liked ? "text-red-600" : "text-gray-600"
+              "flex flex-col items-center gap-1 transition-all active:scale-90",
+              post.has_liked ? "text-red-500" : "text-white"
             )}
           >
-            <Heart size={22} fill={post.has_liked ? "currentColor" : "none"} strokeWidth={2.5} />
-            <span className="text-sm font-black">{(Number(post.likes_count) || 0).toLocaleString('pt-BR')}</span>
+            <Heart size={28} fill={post.has_liked ? "currentColor" : "none"} strokeWidth={2.5} />
+            <span className="text-[10px] font-black text-white">{(Number(post.likes_count) || 0).toLocaleString('pt-BR')}</span>
           </button>
           
           <button 
-            onClick={() => onComment(post)}
-            className="flex items-center gap-1.5 text-gray-600 transition-all active:scale-95"
+            onClick={(e) => { e.stopPropagation(); onComment(post); }}
+            className="flex flex-col items-center gap-1 text-white transition-all active:scale-90"
           >
-            <MessageSquare size={22} strokeWidth={2.5} />
-            <span className="text-sm font-black">{(Number(post.comments_count) || 0).toLocaleString('pt-BR')}</span>
+            <MessageSquare size={28} strokeWidth={2.5} />
+            <span className="text-[10px] font-black text-white">{(Number(post.comments_count) || 0).toLocaleString('pt-BR')}</span>
           </button>
 
-          <button className="flex items-center gap-1.5 text-gray-600 transition-all active:scale-95 ml-auto">
-            <Share2 size={22} strokeWidth={2.5} />
-            <span className="text-sm font-black">{(Number(post.shares_count) || 0).toLocaleString('pt-BR')}</span>
+          <button 
+            onClick={(e) => { e.stopPropagation(); }}
+            className="flex flex-col items-center gap-1 text-white transition-all active:scale-90"
+          >
+            <Share2 size={28} strokeWidth={2.5} />
+            <span className="text-[10px] font-black text-white">{(Number(post.shares_count) || 0).toLocaleString('pt-BR')}</span>
           </button>
-        </div>
-
-        <div className="space-y-2 mb-4">
-          <div>
-            <p 
-              className={cn(
-                "text-sm text-gray-900 font-black leading-snug",
-                !isExpanded && "line-clamp-3",
-                onPostClick && "cursor-pointer"
-              )}
-              onClick={() => onPostClick?.(post)}
-            >
-              {post.description}
-            </p>
-            {isLongDescription && !isExpanded && (
-              <button 
-                onClick={() => setIsExpanded(true)}
-                className="text-blue-600 text-sm font-bold mt-1 hover:underline"
-              >
-                ver mais...
-              </button>
-            )}
-          </div>
-          {post.comments_count > 0 && (
-            <button 
-              onClick={() => onComment(post)}
-              className="text-xs text-blue-600 font-bold mt-1 uppercase tracking-tighter"
-            >
-              Ver todos os {(Number(post.comments_count) || 0).toLocaleString('pt-BR')} comentários
-            </button>
-          )}
         </div>
       </div>
-      <div className="h-[16px] w-full bg-black" />
+
+      {/* Follow Button - Right after image with 4px separation */}
+      <div className="mt-[4px] px-4 flex justify-end">
+        <button 
+          className="bg-blue-600 text-white text-[10px] font-bold px-4 py-1.5 rounded-[3px] active:scale-95 transition-transform shadow-sm"
+          onClick={(e) => { e.stopPropagation(); }}
+        >
+          Seguir
+        </button>
+      </div>
+
+      {/* Description Only */}
+      <div className="px-4 pt-[4px] pb-4">
+        <p 
+          className={cn(
+            "text-xs text-gray-900 font-medium leading-relaxed",
+            !isExpanded && "line-clamp-4",
+            onPostClick && "cursor-pointer"
+          )}
+          onClick={() => onPostClick?.(post)}
+        >
+          {post.description}
+        </p>
+        {isLongDescription && !isExpanded && (
+          <div className="mt-1">
+            <button 
+              onClick={() => setIsExpanded(true)}
+              className="text-gray-500 text-[10px] font-bold"
+            >
+              ...ver mais
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -340,7 +351,7 @@ const ServiceCard: React.FC<{ service: Service, onClick: () => void }> = ({ serv
   return (
     <div 
       onClick={onClick}
-      className="bg-gray-100 rounded-[3px] overflow-hidden shadow-sm border border-gray-200 cursor-pointer active:scale-[0.98] transition-transform"
+      className="bg-white rounded-[3px] overflow-hidden border border-[#D1D5DB] cursor-pointer active:scale-[0.98] transition-transform"
     >
       <div className="aspect-[4/3] relative">
         <img 
@@ -348,31 +359,31 @@ const ServiceCard: React.FC<{ service: Service, onClick: () => void }> = ({ serv
           className="w-full h-full object-cover"
           alt={service.title}
         />
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-[3px] flex items-center gap-1 shadow-sm">
-          <Star size={12} className="text-yellow-500 fill-yellow-500" />
-          <span className="text-[10px] font-bold text-gray-900">{service.rating || '4.8'}</span>
+        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2 py-1 rounded-[3px] flex items-center gap-1 border border-[#D1D5DB] shadow-sm">
+          <Star size={10} className="text-yellow-500 fill-yellow-500" />
+          <span className="text-[9px] font-bold text-gray-900">{service.rating || '4.8'}</span>
         </div>
       </div>
       <div className="p-3">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-[3px] uppercase tracking-wider">
+          <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-[2px] uppercase tracking-wider">
             {service.category}
           </span>
         </div>
-        <h3 className="text-sm font-bold text-gray-900 line-clamp-1 mb-1">{service.title}</h3>
+        <h3 className="text-xs font-bold text-gray-900 line-clamp-1 mb-1">{service.title}</h3>
         <div className="flex items-center gap-1 text-gray-500 mb-2">
-          <MapPin size={12} />
-          <span className="text-[10px]">{service.location}</span>
+          <MapPin size={10} />
+          <span className="text-[9px]">{service.location}</span>
         </div>
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200">
-          <p className="text-sm font-bold text-blue-600">{service.price}</p>
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between mt-2 pt-2 border-t-[2.5px] border-[#D1D5DB]">
+          <p className="text-xs font-black text-blue-600">{service.price}</p>
+          <div className="flex items-center gap-1.5">
             <img 
               src={authorAvatar} 
-              className="w-[30px] h-[30px] rounded-[3px] object-cover"
+              className="w-[24px] h-[24px] rounded-[3px] object-cover border border-[#D1D5DB]"
               alt={authorName}
             />
-            <span className="text-[10px] text-gray-600 font-bold">{authorName.split(' ')[0]}</span>
+            <span className="text-[9px] text-gray-600 font-bold">{authorName.split(' ')[0]}</span>
           </div>
         </div>
       </div>
@@ -530,7 +541,37 @@ const CommentsView = ({ post, onClose, userProfile }: { post: Post, onClose: () 
   );
 };
 
-const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, onCommentClick, onChatClick, onBookClick }: { post: Post, onClose: () => void, userProfile: Profile | null, onLike: (id: string) => void | Promise<void>, onProfileClick: (id: string) => void, onCommentClick: () => void, onChatClick: (userId: string) => void, onBookClick: (post: Post) => void }) => {
+const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, onCommentClick, onChatClick, onBookClick, onPostClick }: { post: Post, onClose: () => void, userProfile: Profile | null, onLike: (id: string) => void | Promise<void>, onProfileClick: (id: string) => void, onCommentClick: () => void, onChatClick: (userId: string) => void, onBookClick: (post: Post) => void, onPostClick?: (post: Post) => void }) => {
+  const [relatedPosts, setRelatedPosts] = useState<Post[]>([]);
+  const [loadingRelated, setLoadingRelated] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchRelated = async () => {
+      setLoadingRelated(true);
+      try {
+        const { data, error } = await supabase
+          .from('services')
+          .select('*, profiles(*)')
+          .eq('category', post.category)
+          .neq('id', post.id)
+          .limit(5);
+
+        if (error) throw error;
+        setRelatedPosts(data || []);
+      } catch (err) {
+        console.error('Error fetching related posts:', err);
+      } finally {
+        setLoadingRelated(false);
+      }
+    };
+
+    fetchRelated();
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo(0, 0);
+    }
+  }, [post.id, post.category]);
+
   return (
     <motion.div 
       initial={{ x: '100%' }}
@@ -539,7 +580,7 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       className="fixed inset-0 bg-gray-50 z-[60] flex flex-col"
     >
-      <div className="bg-white p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 z-10">
+      <div className="bg-white p-4 border-b-[2.5px] border-[#D1D5DB] flex items-center justify-between sticky top-0 z-10">
         <button onClick={onClose} className="p-1.5 -ml-2 rounded-[3px] hover:bg-gray-50 text-gray-900">
           <ChevronLeft size={24} strokeWidth={2.5} />
         </button>
@@ -547,9 +588,9 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
         <div className="w-10" />
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-20 bg-white">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-20 bg-white">
         {/* Title & Meta */}
-        <div className="p-4 border-b border-gray-100">
+        <div className="p-4 border-b-[2.5px] border-[#D1D5DB]">
           <h1 className="text-xl font-bold text-gray-900 leading-tight mb-2">
             {post.title || 'Publicação'}
           </h1>
@@ -685,9 +726,50 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
             </div>
           </div>
         </div>
+
+        {/* Related Services */}
+        <div className="p-4 border-t-[2.5px] border-[#D1D5DB] mt-4">
+          <h3 className="font-bold text-gray-900 mb-4 text-sm">Serviços Relacionados</h3>
+          {loadingRelated ? (
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="flex gap-3 animate-pulse">
+                  <div className="w-20 h-20 bg-gray-100 rounded-[3px]" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-100 rounded w-3/4" />
+                    <div className="h-3 bg-gray-100 rounded w-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : relatedPosts.length > 0 ? (
+            <div className="space-y-4">
+              {relatedPosts.map(related => (
+                <div 
+                  key={related.id} 
+                  className="flex gap-3 cursor-pointer active:scale-[0.98] transition-transform"
+                  onClick={() => onPostClick?.(related)}
+                >
+                  <img 
+                    src={related.image_url || 'https://picsum.photos/seed/rel/200/200'} 
+                    className="w-20 h-20 rounded-[3px] object-cover bg-gray-50"
+                    alt={related.title}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-bold text-gray-900 truncate">{related.title}</h4>
+                    <p className="text-xs text-gray-500 line-clamp-2 mt-1">{related.description}</p>
+                    <p className="text-xs font-bold text-blue-600 mt-1">{related.location}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 italic">Nenhum serviço relacionado encontrado.</p>
+          )}
+        </div>
         
         {/* Interaction Bar (Like/Comment) */}
-        <div className="p-4 bg-white border-t border-gray-100 flex items-center justify-between">
+        <div className="p-4 bg-white border-t-[2.5px] border-[#D1D5DB] flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => onLike(post.id)}
@@ -732,6 +814,8 @@ export default function App() {
   const [showBookingModal, setShowBookingModal] = useState<Post | null>(null);
   const [showSideMenu, setShowSideMenu] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
+  const authInitialized = useRef(false);
+  const fetchingProfileId = useRef<string | null>(null);
 
   const categories = [
     { id: 'find', name: 'Encontrar', icon: Search },
@@ -741,30 +825,135 @@ export default function App() {
     { id: 'categories', name: 'Categorias', icon: LayoutGrid },
   ];
 
+  const fetchProfile = useCallback(async (userId: string, metadata?: any) => {
+    if (fetchingProfileId.current === userId) return;
+    fetchingProfileId.current = userId;
+
+    try {
+      console.log('Fetching profile for user:', userId);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      // Get metadata from either the passed metadata or the current user state
+      const userMetadata = metadata;
+      
+      // Google often uses 'name' and 'picture' instead of 'name' and 'photoUrl'
+      const name = userMetadata?.full_name || userMetadata?.name || 'Usuário';
+      const photoUrl = userMetadata?.avatar_url || userMetadata?.photoUrl || userMetadata?.picture || '';
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('Profile not found, creating new profile...');
+          // Profile doesn't exist, create it
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({ 
+              id: userId, 
+              name: name, 
+              photoUrl: photoUrl,
+              email: userMetadata?.email || '',
+              role: 'user',
+              plan: 'free',
+              verified: false,
+              verificationStatus: 'none',
+              terms_accepted: true
+            })
+            .select('*')
+            .single();
+          
+          if (createError) throw createError;
+          console.log('New profile created:', newProfile);
+          setProfile(newProfile);
+        } else {
+          throw error;
+        }
+      } else {
+        console.log('Profile found:', data);
+        
+        // If profile exists but name/avatar is missing, update it from metadata
+        let updatedData: any = {};
+        let shouldUpdate = false;
+
+        if ((!data.name || data.name === 'Usuário') && name !== 'Usuário') {
+           updatedData.name = name;
+           shouldUpdate = true;
+        }
+        if (!data.photoUrl && photoUrl) {
+           updatedData.photoUrl = photoUrl;
+           shouldUpdate = true;
+        }
+
+        if (shouldUpdate) {
+           console.log('Updating existing profile with metadata:', updatedData);
+           const { data: updatedProfile } = await supabase
+             .from('profiles')
+             .update(updatedData)
+             .eq('id', userId)
+             .select('*')
+             .single();
+           
+           if (updatedProfile) {
+             setProfile(updatedProfile);
+             return;
+           }
+        }
+        
+        setProfile(data);
+      }
+    } catch (err) {
+      console.error('Error in fetchProfile:', err);
+    } finally {
+      fetchingProfileId.current = null;
+    }
+  }, []);
+
   // Auth Listener
   useEffect(() => {
+    if (authInitialized.current) return;
+    authInitialized.current = true;
+
     const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id, session.user.user_metadata);
+      try {
+        // Use getUser() instead of getSession() for better security
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error) {
+          // If there's an error, it might just mean no session
+          setUser(null);
+          setProfile(null);
+        } else if (user) {
+          setUser(user);
+          await fetchProfile(user.id, user.user_metadata);
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id, session.user.user_metadata);
-      } else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (currentUser) {
+          await fetchProfile(currentUser.id, currentUser.user_metadata);
+        }
+      } else if (event === 'SIGNED_OUT') {
         setProfile(null);
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchProfile]);
 
   // Hash Routing
   useEffect(() => {
@@ -805,86 +994,6 @@ export default function App() {
     fetchProfessionals();
   }, [user]);
 
-  const fetchProfile = async (userId: string, metadata?: any) => {
-    try {
-      console.log('Fetching profile for user:', userId);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      // Get metadata from either the passed metadata or the current user state
-      const userMetadata = metadata || user?.user_metadata;
-      
-      // Google often uses 'name' and 'picture' instead of 'name' and 'photoUrl'
-      const name = userMetadata?.full_name || userMetadata?.name || 'Usuário';
-      const photoUrl = userMetadata?.avatar_url || userMetadata?.photoUrl || userMetadata?.picture || '';
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.log('Profile not found, creating new profile...');
-          // Profile doesn't exist, create it
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({ 
-              id: userId, 
-              name: name, 
-              photoUrl: photoUrl,
-              email: userMetadata?.email || user?.email || '',
-              role: 'user',
-              plan: 'free',
-              verified: false,
-              verificationStatus: 'none',
-              terms_accepted: true
-            })
-            .select('*')
-            .single();
-          
-          if (createError) throw createError;
-          console.log('New profile created:', newProfile);
-          setProfile(newProfile);
-        } else {
-          throw error;
-        }
-      } else {
-        console.log('Profile fetched successfully:', data);
-        
-        // If profile exists but name/avatar is missing, update it from metadata
-        let updatedData: any = {};
-        let shouldUpdate = false;
-
-        if ((!data.name || data.name === 'Usuário') && name !== 'Usuário') {
-           updatedData.name = name;
-           shouldUpdate = true;
-        }
-        if (!data.photoUrl && photoUrl) {
-           updatedData.photoUrl = photoUrl;
-           shouldUpdate = true;
-        }
-
-        if (shouldUpdate) {
-           console.log('Updating existing profile with metadata:', updatedData);
-           const { data: updatedProfile } = await supabase
-             .from('profiles')
-             .update(updatedData)
-             .eq('id', userId)
-             .select('*')
-             .single();
-           
-           if (updatedProfile) {
-             setProfile(updatedProfile);
-             return;
-           }
-        }
-        
-        setProfile(data);
-      }
-    } catch (err) {
-      console.error('Error fetching profile:', err);
-    }
-  };
-
   const fetchPosts = async () => {
     try {
       const { data, error } = await supabase
@@ -919,7 +1028,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from('services')
-        .select('*, profiles(*)')
+        .select('*, profiles!provider_id(*)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -1062,7 +1171,7 @@ export default function App() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: 280, opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed right-4 top-16 bottom-4 w-[280px] bg-white z-[60] shadow-2xl flex flex-col overflow-hidden border border-gray-100"
+              className="fixed right-4 top-16 bottom-4 w-[280px] bg-white z-[60] shadow-2xl flex flex-col overflow-hidden border border-[#D1D5DB]"
               style={{ borderRadius: '3px' }}
             >
               <div className="p-6 border-b border-gray-50 flex items-center justify-between">
@@ -1108,113 +1217,97 @@ export default function App() {
       </AnimatePresence>
 
       {/* Header & Categories - Unified Sticky Block */}
-      {(view === 'feed' || view === 'category-view') && (
+      {view === 'feed' && (
         <>
-          <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
-            {view === 'feed' && (
-              <header className="px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h1 className="text-[50px] font-black bg-gradient-to-r from-blue-900 to-blue-700 bg-clip-text text-transparent tracking-tighter leading-none">
-                    Serviços
-                  </h1>
-                </div>
-                
-                <div className="flex items-center" style={{ gap: '12px' }}>
-                  <button 
-                    onClick={() => setView('create-post')}
-                    className="bg-white/90 backdrop-blur-md text-black px-4 py-2 rounded-[30px] font-black text-[10px] uppercase tracking-tighter shadow-lg border border-white/50 active:scale-95 transition-all whitespace-nowrap flex items-center gap-1.5"
-                  >
-                    <PlusSquare size={16} strokeWidth={3} />
-                    Publicar agora
-                  </button>
-                  <button onClick={() => setShowSideMenu(true)} className="p-1 text-gray-900 active:scale-90 transition-transform">
-                    <Menu size={24} strokeWidth={3} />
-                  </button>
-                </div>
-              </header>
-            )}
+          <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b-[2.5px] border-[#D1D5DB] shadow-sm">
+            <header className="px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h1 className="text-[50px] font-black bg-gradient-to-r from-blue-900 to-blue-700 bg-clip-text text-transparent tracking-tighter leading-none">
+                  Serviços
+                </h1>
+              </div>
+              
+              <div className="flex items-center" style={{ gap: '12px' }}>
+                <button 
+                  onClick={() => setView('create-post')}
+                  className="bg-gray-100 text-gray-900 px-4 py-2 rounded-[30px] font-black text-[10px] uppercase tracking-tighter active:scale-95 transition-all whitespace-nowrap flex items-center gap-1.5"
+                >
+                  <PlusSquare size={16} strokeWidth={3} />
+                  Publicar agora
+                </button>
+                <button onClick={() => setShowSideMenu(true)} className="p-1 text-gray-900 active:scale-90 transition-transform">
+                  <Menu size={24} strokeWidth={3} />
+                </button>
+              </div>
+            </header>
 
             {/* Categories Bar */}
-            <div className={cn("overflow-x-auto no-scrollbar", view === 'category-view' ? "py-4" : "pt-2")}>
-              <div className="flex px-4 items-center gap-6 pr-12">
-                {view === 'category-view' && (
-                  <button 
-                    onClick={() => setView('feed')}
-                    className="flex-shrink-0 w-12 h-12 flex items-center justify-center mr-2 text-black hover:bg-gray-100 rounded-[16px] transition-colors"
-                  >
-                    <ArrowLeft size={24} strokeWidth={3} />
-                  </button>
-                )}
-                {categories.map((cat) => (
-                  <button 
-                    key={cat.id} 
-                    onClick={() => { setActiveCategory(cat.id); setView('category-view'); }}
-                    className="flex-shrink-0 flex flex-col items-center gap-1.5 relative pb-3"
-                  >
-                    <div className={cn(
-                      "w-12 h-12 flex items-center justify-center border-2 rounded-[16px] transition-all duration-300",
-                      activeCategory === cat.id 
-                        ? "bg-blue-600 border-blue-600 shadow-md shadow-blue-200" 
-                        : "border-black opacity-60"
-                    )}>
-                      <cat.icon 
-                        size={24} 
-                        className={activeCategory === cat.id ? "text-white" : "text-black"} 
-                        strokeWidth={3} 
-                      />
-                    </div>
-                    <div className="relative">
+            <div className="py-2 bg-white">
+              <div className="px-4 flex items-center justify-between">
+                <div className="flex items-center w-full justify-between">
+                  {categories.map((cat) => (
+                    <button 
+                      key={cat.id} 
+                      onClick={() => { setActiveCategory(cat.id); setView('category-view'); }}
+                      className="flex flex-col items-center gap-1 transition-transform active:scale-95"
+                    >
+                      <div className={cn(
+                        "w-11 h-11 flex items-center justify-center rounded-[14px] transition-all duration-300",
+                        activeCategory === cat.id 
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-200" 
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      )}>
+                        <cat.icon 
+                          size={22} 
+                          strokeWidth={3} 
+                        />
+                      </div>
                       <span className={cn(
-                        "text-[11px] font-bold whitespace-nowrap transition-colors",
-                        activeCategory === cat.id ? "text-blue-600" : "text-gray-500"
+                        "text-[10px] font-bold transition-colors",
+                        activeCategory === cat.id ? "text-blue-600" : "text-gray-400"
                       )}>
                         {cat.name}
                       </span>
-                      
-                      {activeCategory === cat.id && (
-                        <motion.div 
-                          layoutId="activeCategoryLine"
-                          className="absolute -bottom-3 left-0 right-0 h-1.5 bg-blue-600 rounded-[3px]"
-                          transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                        />
-                      )}
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Horizontal Cards Section - Refined spacing and rounding */}
-          <div className="bg-white overflow-x-auto no-scrollbar py-4 border-t-2 border-b-2 border-gray-200">
-            <div className="flex pl-[2px] pr-4 gap-[4px]">
-              {[1, 2, 3, 4, 5].map((i) => (
+          {/* Horizontal Cards Section - Gray Background Style */}
+          <div className="overflow-x-auto no-scrollbar pt-[5px] pb-[5px] bg-gray-100">
+            <div className="flex px-1 gap-[6px]">
+              {posts.slice(0, 6).map((post) => (
                 <div 
-                  key={`promo-${i}`}
-                  className="flex-[0_0_85%] sm:flex-[0_0_320px] aspect-[16/9] rounded-[3px] overflow-hidden relative group active:scale-[0.98] transition-transform shadow-xl shadow-black/10"
+                  key={`promo-${post.id}`}
+                  onClick={() => { setSelectedPost(post); setShowPostDetail(true); }}
+                  className="flex-[0_0_calc(50%-7px)] sm:flex-[0_0_250px] group active:scale-[0.98] transition-transform cursor-pointer"
                 >
-                  <img 
-                    src={`https://picsum.photos/seed/promo${i}/800/450`} 
-                    alt="Promo" 
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent p-4 flex flex-col justify-end">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-blue-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-widest">Exclusivo</span>
-                    </div>
-                    <h3 className="text-white font-black text-sm leading-tight">Super Oferta: {categories[i % categories.length].name}</h3>
-                    <p className="text-white/70 text-[9px] font-medium mt-0.5 line-clamp-1 italic">Aproveite os melhores profissionais!</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className="bg-white text-black text-[9px] font-black px-3 py-1.5 rounded-[3px] uppercase tracking-tighter shadow-lg">
-                        Reservar Agora
-                      </div>
+                  <div className="h-[250px] w-full overflow-hidden rounded-[10px] bg-gray-50/30 relative">
+                    <img 
+                      src={post.image_url || `https://picsum.photos/seed/${post.id}/800/450`} 
+                      alt="Promo" 
+                      className="w-full h-full object-cover transition-transform duration-500"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-3">
+                      <p className="text-white font-bold text-[11px] leading-tight line-clamp-2">
+                        {post.description}
+                      </p>
                     </div>
                   </div>
                 </div>
               ))}
+              {posts.length === 0 && [1, 2, 3, 4].map((i) => (
+                <div 
+                  key={`skeleton-${i}`}
+                  className="flex-[0_0_calc(50%-7px)] sm:flex-[0_0_250px] h-[250px] rounded-[10px] bg-gray-200 animate-pulse"
+                />
+              ))}
             </div>
           </div>
+          <div className="h-[2.5px] w-full bg-[#D1D5DB]" />
         </>
       )}
 
@@ -1238,7 +1331,24 @@ export default function App() {
         )}
 
         {view === 'category-view' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pt-6 bg-gray-50/50 min-h-screen shadow-inner">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 bg-white min-h-screen">
+            <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b-[2.5px] border-[#D1D5DB] px-4 py-4 flex items-center gap-4">
+              <button 
+                onClick={() => setView('feed')}
+                className="w-10 h-10 flex items-center justify-center text-black hover:bg-gray-100 rounded-[12px] transition-colors"
+              >
+                <ArrowLeft size={20} strokeWidth={3} />
+              </button>
+              <div>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">
+                  {categories.find(c => c.id === activeCategory)?.name || 'Explorar'}
+                </h2>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  {posts.filter(p => p.category === activeCategory || activeCategory === 'all').length} resultados
+                </p>
+              </div>
+            </div>
+            
             <div className="space-y-0">
               {posts.filter(p => p.category === activeCategory || activeCategory === 'all').map(post => (
                 <PostCard 
@@ -1319,7 +1429,7 @@ export default function App() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 px-2 py-1 flex items-center justify-around z-40 safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-[2.5px] border-[#D1D5DB] px-2 py-1 flex items-center justify-around z-40 safe-area-bottom">
         <NavItem icon={Home} label="Início" active={view === 'feed'} onClick={() => setView('feed')} />
         <NavItem icon={Bell} label="Notificações" active={view === 'notifications'} onClick={() => setView('notifications')} />
         {profile?.role === 'provider' ? (
@@ -1341,6 +1451,7 @@ export default function App() {
             onProfileClick={(id) => { setSelectedProfileId(id); setView('public-profile'); }}
             onClose={() => setShowPostDetail(false)} 
             onCommentClick={() => setShowComments(true)}
+            onPostClick={(p) => setSelectedPost(p)}
             onChatClick={(userId) => {
               setShowDirectChat(userId);
             }}

@@ -67,13 +67,16 @@ CREATE TABLE IF NOT EXISTS public.bookings (
 CREATE TABLE IF NOT EXISTS public.services (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    provider_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    provider_id UUID NOT NULL,
+    user_id UUID NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
     price DECIMAL(10,2),
     category TEXT,
     image_url TEXT,
-    rating DECIMAL(3,2) DEFAULT 0
+    rating DECIMAL(3,2) DEFAULT 0,
+    CONSTRAINT services_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.profiles(id) ON DELETE CASCADE,
+    CONSTRAINT services_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE
 );
 
 -- 7. Conversations & Messages
