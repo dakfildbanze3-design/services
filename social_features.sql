@@ -16,13 +16,15 @@ CREATE TABLE IF NOT EXISTS public.posts (
     phone_number TEXT,
     likes_count INTEGER DEFAULT 0,
     comments_count INTEGER DEFAULT 0,
-    shares_count INTEGER DEFAULT 0
+    shares_count INTEGER DEFAULT 0,
+    images TEXT[] DEFAULT '{}'
 );
 
 -- Add columns if they don't exist (for existing tables)
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS available_hours TEXT;
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS phone_number TEXT;
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS shares_count INTEGER DEFAULT 0;
+ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
 
 -- 2. Likes table
 CREATE TABLE IF NOT EXISTS public.likes (
@@ -74,10 +76,14 @@ CREATE TABLE IF NOT EXISTS public.services (
     price DECIMAL(10,2),
     category TEXT,
     image_url TEXT,
+    images TEXT[] DEFAULT '{}',
     rating DECIMAL(3,2) DEFAULT 0,
     CONSTRAINT services_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES public.profiles(id) ON DELETE CASCADE,
     CONSTRAINT services_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE
 );
+
+-- Add images to services if it doesn't exist
+ALTER TABLE public.services ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
 
 -- 7. Conversations & Messages
 CREATE TABLE IF NOT EXISTS public.conversations (

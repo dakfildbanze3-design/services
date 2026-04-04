@@ -6,7 +6,7 @@ import {
   PlusSquare, 
   MessageCircle, 
   User, 
-  Heart, 
+  ThumbsUp, 
   MessageSquare, 
   Share2, 
   MapPin, 
@@ -48,7 +48,10 @@ import {
   CheckCircle,
   Flame,
   Trophy,
-  LayoutGrid
+  LayoutGrid,
+  UserPlus,
+  CheckCheck,
+  Forward
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -112,12 +115,15 @@ interface Post {
   user_id: string;
   title: string;
   description: string;
+  price?: string;
   image_url: string;
+  images?: string[];
   likes_count: number;
   comments_count: number;
   shares_count: number;
   profiles: Profile;
   has_liked?: boolean;
+  is_following?: boolean;
   category?: string;
   location?: string;
   available_hours?: string;
@@ -132,6 +138,7 @@ interface Service {
   description: string;
   price: string;
   image_url: string;
+  images?: string[];
   category: string;
   location: string;
   rating?: number;
@@ -151,11 +158,19 @@ interface Comment {
 
 // --- Components ---
 
-const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
+const SplashScreen = ({ onComplete, loading }: { onComplete: () => void, loading: boolean }) => {
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+
   useEffect(() => {
-    const timer = setTimeout(onComplete, 2500);
+    const timer = setTimeout(() => setMinTimeElapsed(true), 2500);
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && minTimeElapsed) {
+      onComplete();
+    }
+  }, [loading, minTimeElapsed, onComplete]);
 
   return (
     <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
@@ -191,7 +206,7 @@ const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
       </motion.div>
       {/* Footer app name */}
       <div className="absolute bottom-8 w-full text-center">
-        <p className="text-sm font-bold text-blue-600">Serviços Já</p>
+        <p className="text-sm font-bold text-blue-600">Boladas</p>
       </div>
     </div>
   );
@@ -219,12 +234,92 @@ const NavItem = ({ icon: Icon, label, active, onClick }: any) => (
   </button>
 );
 
-const PostCard: React.FC<{ post: Post, onLike: (id: string) => void | Promise<void>, onComment: (post: Post) => void, onProfileClick: (id: string) => void, onPostClick?: (post: Post) => void, isDetail?: boolean }> = ({ post, onLike, onComment, onProfileClick, onPostClick, isDetail }) => {
+// --- Components ---
+
+const ImageGrid: React.FC<{ images: string[], title: string, price?: string, onClick?: () => void }> = ({ images, title, price, onClick }) => {
+  if (!images || images.length === 0) return null;
+
+  const count = images.length;
+
+  const PriceTag = () => {
+    if (!price) return null;
+    return (
+      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-[3px] shadow-xl border border-[#D1D5DB] z-20">
+        <span className="text-xs font-black text-blue-600 tracking-tighter">{price} Kz</span>
+      </div>
+    );
+  };
+
+  if (count === 1) {
+    return (
+      <div className={cn("w-full bg-gray-50 flex items-center justify-center relative", onClick && "cursor-pointer")} onClick={onClick}>
+        <PriceTag />
+        <img src={images[0]} className="w-full h-auto object-contain max-h-[500px]" alt={title} />
+      </div>
+    );
+  }
+
+  if (count === 2) {
+    return (
+      <div className={cn("grid grid-cols-2 gap-1 w-full aspect-square bg-gray-50 relative", onClick && "cursor-pointer")} onClick={onClick}>
+        <PriceTag />
+        <img src={images[0]} className="w-full h-full object-cover" alt={title} />
+        <img src={images[1]} className="w-full h-full object-cover" alt={title} />
+      </div>
+    );
+  }
+
+  if (count === 3) {
+    return (
+      <div className={cn("grid grid-cols-3 gap-1 w-full aspect-[4/3] bg-gray-50 relative", onClick && "cursor-pointer")} onClick={onClick}>
+        <PriceTag />
+        <div className="col-span-2 h-full">
+          <img src={images[0]} className="w-full h-full object-cover" alt={title} />
+        </div>
+        <div className="grid grid-rows-2 gap-1 h-full">
+          <img src={images[1]} className="w-full h-full object-cover" alt={title} />
+          <img src={images[2]} className="w-full h-full object-cover" alt={title} />
+        </div>
+      </div>
+    );
+  }
+
+  // 4 or more
+  return (
+    <div className={cn("grid grid-cols-2 gap-1 w-full aspect-square bg-gray-50 relative", onClick && "cursor-pointer")} onClick={onClick}>
+      <PriceTag />
+      <img src={images[0]} className="w-full h-full object-cover" alt={title} />
+      <img src={images[1]} className="w-full h-full object-cover" alt={title} />
+      <img src={images[2]} className="w-full h-full object-cover" alt={title} />
+      <div className="relative">
+        <img src={images[3]} className="w-full h-full object-cover" alt={title} />
+        {count > 4 && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <span className="text-white font-black text-xl">+{count - 4}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const PostCard: React.FC<{ 
+  post: Post, 
+  onLike: (id: string) => void | Promise<void>, 
+  onComment: (post: Post) => void, 
+  onProfileClick: (id: string) => void, 
+  onFollow: (id: string) => void, 
+  onShare: (id: string) => void, 
+  currentUserId?: string,
+  onPostClick?: (post: Post) => void, 
+  isDetail?: boolean 
+}> = ({ post, onLike, onComment, onProfileClick, onFollow, onShare, currentUserId, onPostClick, isDetail }) => {
   const [isExpanded, setIsExpanded] = useState(isDetail || false);
   const [showOptions, setShowOptions] = useState(false);
   const authorName = post.profiles?.name || 'Usuário';
   const authorAvatar = post.profiles?.photoUrl || `https://ui-avatars.com/api/?name=${authorName}`;
   const isLongDescription = post.description && post.description.length > 200;
+  const hasImage = (post.images && post.images.length > 0) || post.image_url;
 
   return (
     <div className="bg-white border-b-[2.5px] border-[#D1D5DB]">
@@ -291,83 +386,155 @@ const PostCard: React.FC<{ post: Post, onLike: (id: string) => void | Promise<vo
         </div>
       </div>
 
-      {/* Image with Vertical Actions */}
-      <div className="relative group">
-        {post.image_url && (
-          <div 
-            className={cn("w-full bg-gray-50 flex items-center justify-center", onPostClick && "cursor-pointer")} 
-            onClick={() => onPostClick?.(post)}
-          >
-            <img 
-              src={post.image_url} 
-              className="w-full h-auto object-contain max-h-[500px]" 
-              alt={post.title}
+      {/* Content Area */}
+      {hasImage ? (
+        <>
+          {/* Image with Vertical Actions */}
+          <div className="relative group">
+            <ImageGrid 
+              images={post.images && post.images.length > 0 ? [post.images[0]] : (post.image_url ? [post.image_url] : [])} 
+              title={post.title} 
+              price={post.price}
+              onClick={() => onPostClick?.(post)}
             />
-          </div>
-        )}
 
-        {/* Vertical Actions Overlay - Adaptive using mix-blend-mode */}
-        <div className="absolute right-3 bottom-6 flex flex-col items-center gap-5 z-10 mix-blend-difference">
-          <button 
-            onClick={(e) => { e.stopPropagation(); onLike(post.id); }}
-            className={cn(
-              "flex flex-col items-center gap-1 transition-all active:scale-90",
-              post.has_liked ? "text-red-500" : "text-white"
-            )}
-          >
-            <Heart size={28} fill={post.has_liked ? "currentColor" : "none"} strokeWidth={2.5} />
-            <span className="text-[10px] font-black text-white">{(Number(post.likes_count) || 0).toLocaleString('pt-BR')}</span>
-          </button>
-          
-          <button 
-            onClick={(e) => { e.stopPropagation(); onComment(post); }}
-            className="flex flex-col items-center gap-1 text-white transition-all active:scale-90"
-          >
-            <MessageSquare size={28} strokeWidth={2.5} />
-            <span className="text-[10px] font-black text-white">{(Number(post.comments_count) || 0).toLocaleString('pt-BR')}</span>
-          </button>
-
-          <button 
-            onClick={(e) => { e.stopPropagation(); }}
-            className="flex flex-col items-center gap-1 text-white transition-all active:scale-90"
-          >
-            <Share2 size={28} strokeWidth={2.5} />
-            <span className="text-[10px] font-black text-white">{(Number(post.shares_count) || 0).toLocaleString('pt-BR')}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Description and Follow Button - Side by side */}
-      <div className="px-4 pt-2 pb-4 flex items-start gap-4">
-        <div className="flex-1">
-          <p 
-            className={cn(
-              "text-xs text-gray-900 font-medium leading-relaxed",
-              !isExpanded && "line-clamp-4",
-              onPostClick && "cursor-pointer"
-            )}
-            onClick={() => onPostClick?.(post)}
-          >
-            {post.description}
-          </p>
-          {isLongDescription && !isExpanded && (
-            <div className="mt-1">
+            {/* Vertical Actions Overlay - Adaptive using mix-blend-mode */}
+            <div className="absolute right-3 bottom-6 flex flex-col items-center gap-5 z-10 mix-blend-difference">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onLike(post.id); }}
+              className={cn(
+                "flex flex-col items-center gap-1 transition-all active:scale-90",
+                post.has_liked ? "text-blue-500" : "text-white"
+              )}
+            >
+                <ThumbsUp size={32} fill={post.has_liked ? "currentColor" : "none"} strokeWidth={2} />
+                <span className="text-[12px] font-bold text-white drop-shadow-md">{(Number(post.likes_count) || 0).toLocaleString('pt-BR')}</span>
+              </button>
+              
               <button 
-                onClick={() => setIsExpanded(true)}
-                className="text-gray-500 text-[10px] font-bold"
+                onClick={(e) => { e.stopPropagation(); onComment(post); }}
+                className="flex flex-col items-center gap-1 text-white transition-all active:scale-90"
               >
-                ...ver mais
+                <MessageCircle size={32} strokeWidth={2} />
+                <span className="text-[12px] font-bold text-white drop-shadow-md">{(Number(post.comments_count) || 0).toLocaleString('pt-BR')}</span>
+              </button>
+
+              <button 
+                onClick={(e) => { e.stopPropagation(); onShare(post.id); }}
+                className="flex flex-col items-center gap-1 text-white transition-all active:scale-90"
+              >
+                <Forward size={32} strokeWidth={2} />
+                <span className="text-[12px] font-bold text-white drop-shadow-md">{(Number(post.shares_count) || 0).toLocaleString('pt-BR')}</span>
               </button>
             </div>
-          )}
+          </div>
+
+          {/* Description and Follow Button - Side by side */}
+          <div className="px-4 pt-2 pb-4 flex items-start gap-4">
+            <div className="flex-1">
+              <p 
+                className={cn(
+                  "text-xs text-gray-900 font-medium leading-relaxed",
+                  !isExpanded && "line-clamp-4",
+                  onPostClick && "cursor-pointer"
+                )}
+                onClick={() => onPostClick?.(post)}
+              >
+                {post.description}
+              </p>
+              {isLongDescription && !isExpanded && (
+                <div className="mt-1">
+                  <button 
+                    onClick={() => setIsExpanded(true)}
+                    className="text-gray-500 text-[10px] font-bold"
+                  >
+                    ...ver mais
+                  </button>
+                </div>
+              )}
+            </div>
+            {currentUserId !== post.user_id && (
+              <button 
+                className={cn(
+                  "flex-shrink-0 text-[10px] font-bold px-4 py-1.5 rounded-[3px] active:scale-95 transition-all shadow-sm mt-0.5",
+                  post.is_following ? "bg-gray-100 text-gray-600" : "bg-blue-600 text-white"
+                )}
+                onClick={(e) => { e.stopPropagation(); onFollow(post.user_id); }}
+              >
+                {post.is_following ? 'Seguindo' : 'Seguir'}
+              </button>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="px-4 pt-2 pb-4">
+          <div className="flex items-start gap-4 mb-4">
+            <div className="flex-1">
+              <p 
+                className={cn(
+                  "text-sm text-gray-900 font-medium leading-relaxed",
+                  !isExpanded && "line-clamp-6",
+                  onPostClick && "cursor-pointer"
+                )}
+                onClick={() => onPostClick?.(post)}
+              >
+                {post.description}
+              </p>
+              {isLongDescription && !isExpanded && (
+                <div className="mt-1">
+                  <button 
+                    onClick={() => setIsExpanded(true)}
+                    className="text-gray-500 text-[10px] font-bold"
+                  >
+                    ...ver mais
+                  </button>
+                </div>
+              )}
+            </div>
+            {currentUserId !== post.user_id && (
+              <button 
+                className={cn(
+                  "flex-shrink-0 text-[10px] font-bold px-4 py-1.5 rounded-[3px] active:scale-95 transition-all shadow-sm mt-0.5",
+                  post.is_following ? "bg-gray-100 text-gray-600" : "bg-blue-600 text-white"
+                )}
+                onClick={(e) => { e.stopPropagation(); onFollow(post.user_id); }}
+              >
+                {post.is_following ? 'Seguindo' : 'Seguir'}
+              </button>
+            )}
+          </div>
+
+          {/* Horizontal Actions for Text-only Posts */}
+          <div className="flex items-center gap-8 pt-2 border-t border-gray-100">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onLike(post.id); }}
+              className={cn(
+                "flex items-center gap-2 transition-all active:scale-90",
+                post.has_liked ? "text-blue-500" : "text-gray-500"
+              )}
+            >
+              <ThumbsUp size={20} fill={post.has_liked ? "currentColor" : "none"} strokeWidth={2.5} />
+              <span className="text-[12px] font-bold">{(Number(post.likes_count) || 0).toLocaleString('pt-BR')}</span>
+            </button>
+            
+            <button 
+              onClick={(e) => { e.stopPropagation(); onComment(post); }}
+              className="flex items-center gap-2 text-gray-500 transition-all active:scale-90"
+            >
+              <MessageCircle size={20} strokeWidth={2.5} />
+              <span className="text-[12px] font-bold">{(Number(post.comments_count) || 0).toLocaleString('pt-BR')}</span>
+            </button>
+
+            <button 
+              onClick={(e) => { e.stopPropagation(); onShare(post.id); }}
+              className="flex items-center gap-2 text-gray-500 transition-all active:scale-90"
+            >
+              <Forward size={20} strokeWidth={2.5} />
+              <span className="text-[12px] font-bold">{(Number(post.shares_count) || 0).toLocaleString('pt-BR')}</span>
+            </button>
+          </div>
         </div>
-        <button 
-          className="flex-shrink-0 bg-blue-600 text-white text-[10px] font-bold px-4 py-1.5 rounded-[3px] active:scale-95 transition-transform shadow-sm mt-0.5"
-          onClick={(e) => { e.stopPropagation(); }}
-        >
-          Seguir
-        </button>
-      </div>
+      )}
     </div>
   );
 };
@@ -419,7 +586,7 @@ const ServiceCard: React.FC<{ service: Service, onClick: () => void }> = ({ serv
   );
 };
 
-const CommentsView = ({ post, onClose, userProfile }: { post: Post, onClose: () => void, userProfile: Profile | null }) => {
+const CommentsView = ({ post, onClose, userProfile, onCommentAdded }: { post: Post, onClose: () => void, userProfile: Profile | null, onCommentAdded: (postId: string) => void }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
@@ -461,8 +628,20 @@ const CommentsView = ({ post, onClose, userProfile }: { post: Post, onClose: () 
         .single();
 
       if (error) throw error;
+      
+      // Notify post owner
+      if (post.user_id !== userProfile.id) {
+        await supabase.from('notifications').insert({
+          user_id: post.user_id,
+          type: 'comment',
+          content: `${userProfile.name} comentou na sua publicação: ${newComment.trim().substring(0, 30)}${newComment.length > 30 ? '...' : ''}`,
+          data: { post_id: post.id, comment_id: data.id, user_id: userProfile.id }
+        });
+      }
+
       setComments([...comments, data]);
       setNewComment('');
+      onCommentAdded(post.id);
     } catch (err) {
       console.error('Error adding comment:', err);
     }
@@ -569,9 +748,11 @@ const CommentsView = ({ post, onClose, userProfile }: { post: Post, onClose: () 
   );
 };
 
-const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, onCommentClick, onChatClick, onBookClick, onPostClick }: { post: Post, onClose: () => void, userProfile: Profile | null, onLike: (id: string) => void | Promise<void>, onProfileClick: (id: string) => void, onCommentClick: () => void, onChatClick: (userId: string) => void, onBookClick: (post: Post) => void, onPostClick?: (post: Post) => void }) => {
+const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, onCommentClick, onChatClick, onBookClick, onFollow, onShare, onPostClick }: { post: Post, onClose: () => void, userProfile: Profile | null, onLike: (id: string) => void | Promise<void>, onProfileClick: (id: string) => void, onCommentClick: () => void, onChatClick: (userId: string) => void, onBookClick: (post: Post) => void, onFollow: (id: string) => void, onShare: (id: string) => void, onPostClick?: (post: Post) => void }) => {
   const [relatedPosts, setRelatedPosts] = useState<Post[]>([]);
+  const [providerPosts, setProviderPosts] = useState<Post[]>([]);
   const [loadingRelated, setLoadingRelated] = useState(true);
+  const [loadingProvider, setLoadingProvider] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -583,7 +764,7 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
           .select('*, profiles!provider(*)')
           .eq('category', post.category)
           .neq('id', post.id)
-          .limit(5);
+          .limit(6);
 
         if (error) throw error;
         setRelatedPosts(data || []);
@@ -594,7 +775,27 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
       }
     };
 
+    const fetchProviderPosts = async () => {
+      setLoadingProvider(true);
+      try {
+        const { data, error } = await supabase
+          .from('posts')
+          .select('*, profiles(*)')
+          .eq('user_id', post.user_id)
+          .neq('id', post.id)
+          .limit(9);
+
+        if (error) throw error;
+        setProviderPosts(data || []);
+      } catch (err) {
+        console.error('Error fetching provider posts:', err);
+      } finally {
+        setLoadingProvider(false);
+      }
+    };
+
     fetchRelated();
+    fetchProviderPosts();
     if (scrollRef.current) {
       scrollRef.current.scrollTo(0, 0);
     }
@@ -633,14 +834,16 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
         </div>
 
         {/* Image */}
-        {post.image_url && (
-          <div className="relative w-full bg-gray-100 aspect-square">
-            <img src={post.image_url} alt={post.title} className="w-full h-full object-contain" />
-            <button className="absolute bottom-4 right-4 bg-black/50 p-2 rounded-[3px] text-white">
-              <ZoomIn size={20} />
-            </button>
-          </div>
-        )}
+        <div className="relative w-full bg-gray-100">
+          <ImageGrid 
+            images={post.images && post.images.length > 0 ? post.images : (post.image_url ? [post.image_url] : [])} 
+            title={post.title} 
+            price={post.price}
+          />
+          <button className="absolute bottom-4 right-4 bg-black/50 p-2 rounded-[3px] text-white z-10">
+            <ZoomIn size={20} />
+          </button>
+        </div>
 
         {/* Attributes Grid */}
         <div className="p-4 border-b border-gray-100">
@@ -705,6 +908,17 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
                   Ver todos anúncios »
                 </button>
               </div>
+              {userProfile?.id !== post.user_id && (
+                <button 
+                  onClick={() => onFollow(post.user_id)}
+                  className={cn(
+                    "px-4 py-1.5 rounded-[3px] text-[10px] font-bold transition-all active:scale-95",
+                    post.is_following ? "bg-gray-100 text-gray-600" : "bg-blue-600 text-white shadow-sm"
+                  )}
+                >
+                  {post.is_following ? 'Seguindo' : 'Seguir'}
+                </button>
+              )}
             </div>
 
             {/* Contact Buttons */}
@@ -736,7 +950,10 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
 
             {/* Action Buttons */}
             <div className="flex gap-2 mt-4 pt-4 border-t border-gray-100">
-              <button className="flex-1 bg-white border border-gray-300 text-gray-700 font-medium py-2 rounded-[3px] flex items-center justify-center gap-1.5 text-xs">
+              <button 
+                onClick={() => onShare(post.id)}
+                className="flex-1 bg-white border border-gray-300 text-gray-700 font-medium py-2 rounded-[3px] flex items-center justify-center gap-1.5 text-xs active:scale-95 transition-transform"
+              >
                 <Share2 size={14} />
                 Recomendar
               </button>
@@ -748,19 +965,41 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
                 onClick={() => onLike(post.id)}
                 className="flex-1 bg-white border border-gray-300 text-gray-700 font-medium py-2 rounded-[3px] flex items-center justify-center gap-1.5 text-xs"
               >
-                <Heart size={14} className={post.has_liked ? "fill-red-500 text-red-500" : ""} />
+                <ThumbsUp size={14} className={post.has_liked ? "fill-blue-500 text-blue-500" : ""} />
                 Favoritos
               </button>
             </div>
           </div>
         </div>
 
+        {/* More from this Provider - Image Grid */}
+        {providerPosts.length > 0 && (
+          <div className="p-4 border-t-[2.5px] border-[#D1D5DB] mt-4">
+            <h3 className="font-bold text-gray-900 mb-4 text-sm">Mais deste anunciante</h3>
+            <div className="grid grid-cols-3 gap-1">
+              {providerPosts.map(p => (
+                <div 
+                  key={p.id} 
+                  className="aspect-square bg-gray-100 cursor-pointer active:scale-95 transition-transform overflow-hidden"
+                  onClick={() => onPostClick?.(p)}
+                >
+                  <img 
+                    src={p.image_url || 'https://picsum.photos/seed/p/200/200'} 
+                    className="w-full h-full object-cover"
+                    alt={p.title}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Related Services */}
         <div className="p-4 border-t-[2.5px] border-[#D1D5DB] mt-4">
           <h3 className="font-bold text-gray-900 mb-4 text-sm">Serviços Relacionados</h3>
           {loadingRelated ? (
             <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map(i => (
+              {[1, 2, 3, 4, 5, 6].map(i => (
                 <div key={i} className="flex gap-3 animate-pulse">
                   <div className="w-20 h-20 bg-gray-100 rounded-[3px]" />
                   <div className="flex-1 space-y-2">
@@ -771,22 +1010,21 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
               ))}
             </div>
           ) : relatedPosts.length > 0 ? (
-            <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
               {relatedPosts.map(related => (
                 <div 
                   key={related.id} 
-                  className="flex gap-3 cursor-pointer active:scale-[0.98] transition-transform"
+                  className="bg-white border border-gray-200 rounded-[3px] overflow-hidden cursor-pointer active:scale-[0.98] transition-transform flex flex-col"
                   onClick={() => onPostClick?.(related)}
                 >
                   <img 
                     src={related.image_url || 'https://picsum.photos/seed/rel/200/200'} 
-                    className="w-20 h-20 rounded-[3px] object-cover bg-gray-50"
+                    className="w-full aspect-video object-cover bg-gray-50"
                     alt={related.title}
                   />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-gray-900 truncate">{related.title}</h4>
-                    <p className="text-xs text-gray-500 line-clamp-2 mt-1">{related.description}</p>
-                    <p className="text-xs font-bold text-blue-600 mt-1">{related.location}</p>
+                  <div className="p-2 flex-1 min-w-0">
+                    <h4 className="text-[11px] font-bold text-gray-900 truncate">{related.title}</h4>
+                    <p className="text-[10px] font-bold text-blue-600 mt-0.5">{related.location}</p>
                   </div>
                 </div>
               ))}
@@ -803,7 +1041,7 @@ const PostDetailView = ({ post, onClose, userProfile, onLike, onProfileClick, on
               onClick={() => onLike(post.id)}
               className="flex items-center gap-1.5 text-gray-600"
             >
-              <Heart size={20} className={post.has_liked ? "fill-red-500 text-red-500" : ""} />
+              <ThumbsUp size={20} className={post.has_liked ? "fill-blue-500 text-blue-500" : ""} />
               <span className="text-sm font-medium">{post.likes_count || 0}</span>
             </button>
             <button 
@@ -830,6 +1068,15 @@ export default function App() {
   const [view, setView] = useState<View>('splash');
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const profileRef = useRef<Profile | null>(null);
+
+  // Update ref when state changes
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
+
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -876,6 +1123,9 @@ export default function App() {
   ];
 
   const fetchProfile = useCallback(async (userId: string, metadata?: any) => {
+    // If we already have the profile for this user, don't fetch again
+    if (profileRef.current?.id === userId) return;
+    
     if (fetchingProfileId.current === userId) return;
     fetchingProfileId.current = userId;
 
@@ -922,36 +1172,18 @@ export default function App() {
         }
       } else {
         console.log('Profile found:', data);
-        
-        // If profile exists but name/avatar is missing, update it from metadata
-        let updatedData: any = {};
-        let shouldUpdate = false;
-
-        if ((!data.name || data.name === 'Usuário') && name !== 'Usuário') {
-           updatedData.name = name;
-           shouldUpdate = true;
-        }
-        if (!data.photoUrl && photoUrl) {
-           updatedData.photoUrl = photoUrl;
-           shouldUpdate = true;
-        }
-
-        if (shouldUpdate) {
-           console.log('Updating existing profile with metadata:', updatedData);
-           const { data: updatedProfile } = await supabase
-             .from('profiles')
-             .update(updatedData)
-             .eq('id', userId)
-             .select('*')
-             .single();
-           
-           if (updatedProfile) {
-             setProfile(updatedProfile);
-             return;
-           }
-        }
-        
         setProfile(data);
+        
+        // Background check for metadata updates to keep it fast
+        if (((!data.name || data.name === 'Usuário') && name !== 'Usuário') || (!data.photoUrl && photoUrl)) {
+           console.log('Updating existing profile with metadata in background');
+           supabase.from('profiles').update({
+             name: (!data.name || data.name === 'Usuário') ? name : data.name,
+             photoUrl: !data.photoUrl ? photoUrl : data.photoUrl
+           }).eq('id', userId).select('*').single().then(({ data: updated }) => {
+             if (updated) setProfile(updated);
+           });
+        }
       }
     } catch (err) {
       console.error('Error in fetchProfile:', err);
@@ -967,16 +1199,22 @@ export default function App() {
 
     const initAuth = async () => {
       try {
-        // Use getUser() instead of getSession() for better security
-        const { data: { user }, error } = await supabase.auth.getUser();
+        // Use getSession() first for faster initial check
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (error) {
-          // If there's an error, it might just mean no session
-          setUser(null);
-          setProfile(null);
-        } else if (user) {
-          setUser(user);
-          await fetchProfile(user.id, user.user_metadata);
+        if (sessionError || !session) {
+          // If no session, try getUser() just in case
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          if (user) {
+            setUser(user);
+            await fetchProfile(user.id, user.user_metadata);
+          } else {
+            setUser(null);
+            setProfile(null);
+          }
+        } else if (session.user) {
+          setUser(session.user);
+          await fetchProfile(session.user.id, session.user.user_metadata);
         }
       } catch (err) {
         console.error('Auth initialization error:', err);
@@ -1035,14 +1273,63 @@ export default function App() {
         window.location.hash = view;
       }
     }
-  }, [view]);
+    if (view === 'notifications') {
+      fetchNotifications();
+    }
+  }, [view, user]);
 
   // Data Fetching
   useEffect(() => {
     fetchPosts();
     fetchServices();
     fetchProfessionals();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    fetchNotifications();
+
+    const channel = supabase
+      .channel('public:notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          setNotifications((prev) => {
+            if (prev.some((n: any) => n.id === payload.new.id)) return prev;
+            return [payload.new, ...prev];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
+
+  const markAllAsRead = async () => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+      
+      if (error) throw error;
+      
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (err) {
+      console.error('Error marking notifications as read:', err);
+    }
+  };
 
   const fetchPosts = async () => {
     try {
@@ -1050,25 +1337,38 @@ export default function App() {
       const { data, error } = await supabase
         .from('posts')
         .select('*, profiles(*)')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
       
       // Check likes for current user
       if (user) {
-        const { data: userLikes } = await supabase
+        const { data: userLikesData } = await supabase
           .from('likes')
           .select('post_id')
           .eq('user_id', user.id);
         
-        const likedPostIds = new Set(userLikes?.map(l => l.post_id) || []);
+        const { data: userFollowsData } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
+
+        const likedPostIds = new Set(userLikesData?.map(l => l.post_id) || []);
+        const followingIds = new Set(userFollowsData?.map(f => f.following_id) || []);
+
         const postsWithLikes = data?.map(p => ({
           ...p,
-          has_liked: likedPostIds.has(p.id)
+          has_liked: likedPostIds.has(p.id),
+          is_following: followingIds.has(p.user_id)
         })) || [];
-        setPosts(postsWithLikes);
+        
+        // Shuffle posts randomly
+        const shuffledPosts = [...postsWithLikes].sort(() => Math.random() - 0.5);
+        setPosts(shuffledPosts);
       } else {
-        setPosts(data || []);
+        const shuffledPosts = data ? [...data].sort(() => Math.random() - 0.5) : [];
+        setPosts(shuffledPosts);
       }
     } catch (err: any) {
       console.error('Error fetching posts:', err);
@@ -1083,10 +1383,14 @@ export default function App() {
       const { data, error } = await supabase
         .from('services')
         .select('*, profiles!provider(*)')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
-      setServices(data || []);
+      
+      // Shuffle services randomly
+      const shuffledServices = data ? [...data].sort(() => Math.random() - 0.5) : [];
+      setServices(shuffledServices);
     } catch (err) {
       console.error('Error fetching services:', err);
     }
@@ -1107,6 +1411,100 @@ export default function App() {
     }
   };
 
+  const fetchNotifications = async () => {
+    if (!user) return;
+    setLoadingNotifications(true);
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const createNotification = async (userId: string, type: string, content: string, data: any = {}) => {
+    if (!userId) return;
+    try {
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        type,
+        content,
+        data
+      });
+    } catch (err) {
+      console.error('Error creating notification:', err);
+    }
+  };
+
+  const handleFollow = async (followingId: string) => {
+    if (!user || user.id === followingId) return;
+    try {
+      const { data: existingFollow, error: checkError } = await supabase
+        .from('follows')
+        .select('*')
+        .eq('follower_id', user.id)
+        .eq('following_id', followingId)
+        .maybeSingle();
+
+      if (existingFollow) {
+        await supabase.from('follows').delete().eq('id', existingFollow.id);
+      } else {
+        await supabase.from('follows').insert({ follower_id: user.id, following_id: followingId });
+        // Notify the user being followed
+        await createNotification(
+          followingId,
+          'follow',
+          `${profile?.name || 'Alguém'} começou a seguir você.`,
+          { follower_id: user.id }
+        );
+      }
+      
+      // Update posts state to reflect follow status
+      setPosts(prev => prev.map(p => p.user_id === followingId ? { ...p, is_following: !existingFollow } : p));
+    } catch (err) {
+      console.error('Error toggling follow:', err);
+    }
+  };
+
+  const handleShare = async (postId: string) => {
+    if (!user) return;
+    const post = posts.find(p => p.id === postId) || services.find(s => s.id === postId);
+    if (!post) return;
+
+    try {
+      // Optimistic update
+      setPosts(prev => prev.map(p => 
+        p.id === postId ? { ...p, shares_count: (Number(p.shares_count) || 0) + 1 } : p
+      ));
+      setServices(prev => prev.map(s => 
+        s.id === postId ? { ...s, shares_count: (Number(s.shares_count) || 0) + 1 } : s
+      ));
+      
+      if (selectedPost?.id === postId) {
+        setSelectedPost(prev => prev ? { ...prev, shares_count: (Number(prev.shares_count) || 0) + 1 } : null);
+      }
+
+      await supabase.rpc('increment_shares', { post_id: postId });
+      
+      await createNotification(
+        post.user_id,
+        'share',
+        postId,
+        `${profile?.name || 'Alguém'} compartilhou sua publicação!`
+      );
+    } catch (err) {
+      console.error('Error sharing:', err);
+    }
+  };
+
   const handleLike = async (postId: string) => {
     if (!user) return;
 
@@ -1116,22 +1514,42 @@ export default function App() {
     const isLiking = !post.has_liked;
 
     // Optimistic update
-    setPosts(posts.map(p => p.id === postId ? {
-      ...p,
-      has_liked: isLiking,
-      likes_count: isLiking ? p.likes_count + 1 : p.likes_count - 1
-    } : p));
+    const updatePost = (p: Post) => {
+      if (p.id !== postId) return p;
+      return {
+        ...p,
+        has_liked: isLiking,
+        likes_count: isLiking ? (Number(p.likes_count) || 0) + 1 : Math.max(0, (Number(p.likes_count) || 0) - 1)
+      };
+    };
+
+    setPosts(prev => prev.map(updatePost));
+    if (selectedPost?.id === postId) {
+      setSelectedPost(prev => prev ? updatePost(prev) : null);
+    }
 
     try {
       if (isLiking) {
         await supabase.from('likes').insert({ user_id: user.id, post_id: postId });
+        // Notify post owner
+        if (post.user_id !== user.id) {
+          await createNotification(
+            post.user_id,
+            'like',
+            `${profile?.name || 'Alguém'} curtiu sua publicação: ${post.title}`,
+            { post_id: postId, user_id: user.id }
+          );
+        }
       } else {
         await supabase.from('likes').delete().eq('user_id', user.id).eq('post_id', postId);
       }
     } catch (err) {
       console.error('Error toggling like:', err);
       // Rollback
-      setPosts(posts.map(p => p.id === postId ? post : p));
+      setPosts(prev => prev.map(p => p.id === postId ? post : p));
+      if (selectedPost?.id === postId) {
+        setSelectedPost(post);
+      }
     }
   };
 
@@ -1146,12 +1564,16 @@ export default function App() {
   const handleBackToProfile = React.useCallback(() => setView('profile'), []);
 
   const handleSplashComplete = React.useCallback(() => {
-    setView('onboarding');
-  }, []);
+    if (user) {
+      setView('feed');
+    } else {
+      setView('onboarding');
+    }
+  }, [user]);
 
   const handleAuthComplete = React.useCallback(() => setView('feed'), []);
 
-  if (view === 'splash') return <SplashScreen onComplete={handleSplashComplete} />;
+  if (view === 'splash') return <SplashScreen onComplete={handleSplashComplete} loading={loading} />;
 
   if (envError || connectionError) {
     return (
@@ -1174,7 +1596,7 @@ export default function App() {
     );
   }
 
-  if (loading) return <LoadingOverlay />;
+  if (loading && view !== 'splash') return <LoadingOverlay />;
 
   if (view === 'onboarding') {
     return (
@@ -1266,7 +1688,7 @@ export default function App() {
                 </button>
                 <button 
                   onClick={() => { 
-                    window.open('https://wa.me/855767005?text=Olá,%20gostaria%20de%20suporte%20no%20aplicativo%20Serviços.', '_blank');
+                    window.open('https://wa.me/855767005?text=Olá,%20gostaria%20de%20suporte%20no%20aplicativo%20Boladas.', '_blank');
                     setShowSideMenu(false); 
                   }}
                   className="w-full flex items-center gap-4 p-3 rounded-[3px] hover:bg-gray-50 transition-colors text-gray-700"
@@ -1276,7 +1698,7 @@ export default function App() {
                 </button>
                 <button 
                   onClick={() => { 
-                    window.open('https://wa.me/855767005?text=Olá,%20gostaria%20de%20ajuda%20no%20aplicativo%20Serviços.', '_blank');
+                    window.open('https://wa.me/855767005?text=Olá,%20gostaria%20de%20ajuda%20no%20aplicativo%20Boladas.', '_blank');
                     setShowSideMenu(false); 
                   }}
                   className="w-full flex items-center gap-4 p-3 rounded-[3px] hover:bg-gray-50 transition-colors text-gray-700"
@@ -1304,7 +1726,7 @@ export default function App() {
             <header className="px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <h1 className="text-[50px] font-black bg-gradient-to-r from-blue-900 to-blue-700 bg-clip-text text-transparent tracking-tighter leading-none">
-                  Serviços
+                  Boladas
                 </h1>
               </div>
               
@@ -1404,7 +1826,17 @@ export default function App() {
                   onLike={handleLike} 
                   onComment={(p) => { setSelectedPost(p); setShowComments(true); }}
                   onPostClick={(p) => { setSelectedPost(p); setShowPostDetail(true); }}
-                  onProfileClick={(id) => { setSelectedProfileId(id); setView('public-profile'); }}
+                  onProfileClick={(id) => { 
+                    if (id === profile?.id) {
+                      setView('profile');
+                    } else {
+                      setSelectedProfileId(id); 
+                      setView('public-profile'); 
+                    }
+                  }}
+                  onFollow={handleFollow}
+                  onShare={handleShare}
+                  currentUserId={profile?.id}
                 />
               ))}
             </div>
@@ -1487,7 +1919,17 @@ export default function App() {
                   onLike={handleLike} 
                   onComment={(p) => { setSelectedPost(p); setShowComments(true); }}
                   onPostClick={(p) => { setSelectedPost(p); setShowPostDetail(true); }}
-                  onProfileClick={(id) => { setSelectedProfileId(id); setView('public-profile'); }}
+                  onProfileClick={(id) => { 
+                    if (id === profile?.id) {
+                      setView('profile');
+                    } else {
+                      setSelectedProfileId(id); 
+                      setView('public-profile'); 
+                    }
+                  }}
+                  onFollow={handleFollow}
+                  onShare={handleShare}
+                  currentUserId={profile?.id}
                 />
               ))}
               {posts.filter(p => {
@@ -1538,11 +1980,20 @@ export default function App() {
         )}
 
         {view === 'explore' && <ExploreView professionals={professionals} />}
-        {view === 'create-post' && <CreatePostView onBack={() => setView('feed')} userProfile={profile} />}
-        {view === 'notifications' && <NotificationsView />}
+        {view === 'create-post' && (
+          <CreatePostView 
+            onBack={() => setView('feed')} 
+            userProfile={profile} 
+            onSuccess={() => {
+              fetchPosts();
+              fetchServices();
+            }}
+          />
+        )}
+        {view === 'notifications' && <NotificationsView notifications={notifications} loading={loadingNotifications} onBack={() => setView('feed')} onMarkAllAsRead={markAllAsRead} />}
         {view === 'panel' && <PanelView userProfile={profile} />}
         {view === 'reservations' && <ReservationsView userProfile={profile} />}
-        {view === 'chat' && <ChatView />}
+        {view === 'chat' && <ChatView currentUser={user} onChatClick={(userId) => setShowDirectChat(userId)} onBack={() => setView('feed')} />}
         {view === 'profile' && (
           <ProfileView 
             profile={profile} 
@@ -1558,6 +2009,7 @@ export default function App() {
         {view === 'public-profile' && selectedProfileId && (
           <PublicProfileView 
             profileId={selectedProfileId} 
+            currentUserId={profile?.id}
             onBack={() => setView('feed')} 
             onPostClick={(p) => { setSelectedPost(p); setShowPostDetail(true); }}
             onCommentClick={(p) => { setSelectedPost(p); setShowComments(true); }}
@@ -1571,11 +2023,6 @@ export default function App() {
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-[2.5px] border-[#D1D5DB] px-2 py-1 flex items-center justify-around z-40 safe-area-bottom">
         <NavItem icon={Home} label="Início" active={view === 'feed'} onClick={() => setView('feed')} />
         <NavItem icon={Bell} label="Notificações" active={view === 'notifications'} onClick={() => setView('notifications')} />
-        {profile?.role === 'provider' ? (
-          <NavItem icon={Grid} label="Painel" active={view === 'panel'} onClick={() => setView('panel')} />
-        ) : (
-          <NavItem icon={Calendar} label="Reservas" active={view === 'reservations'} onClick={() => setView('reservations')} />
-        )}
         <NavItem icon={MessageCircle} label="Chat" active={view === 'chat'} onClick={() => setView('chat')} />
         <NavItem icon={User} label="Perfil" active={view === 'profile'} onClick={() => setView('profile')} />
       </nav>
@@ -1587,10 +2034,20 @@ export default function App() {
             post={selectedPost} 
             userProfile={profile} 
             onLike={handleLike}
-            onProfileClick={(id) => { setSelectedProfileId(id); setView('public-profile'); }}
+            onProfileClick={(id) => { 
+              if (id === profile?.id) {
+                setView('profile');
+                setShowPostDetail(false);
+              } else {
+                setSelectedProfileId(id); 
+                setView('public-profile'); 
+              }
+            }}
             onClose={() => setShowPostDetail(false)} 
             onCommentClick={() => setShowComments(true)}
             onPostClick={(p) => setSelectedPost(p)}
+            onFollow={handleFollow}
+            onShare={handleShare}
             onChatClick={(userId) => {
               setShowDirectChat(userId);
             }}
@@ -1604,6 +2061,12 @@ export default function App() {
             post={selectedPost} 
             userProfile={profile} 
             onClose={() => setShowComments(false)} 
+            onCommentAdded={(postId) => {
+              setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments_count: (Number(p.comments_count) || 0) + 1 } : p));
+              if (selectedPost?.id === postId) {
+                setSelectedPost(prev => prev ? { ...prev, comments_count: (Number(prev.comments_count) || 0) + 1 } : null);
+              }
+            }}
           />
         )}
 
@@ -1611,6 +2074,7 @@ export default function App() {
           <DirectChatView 
             userId={showDirectChat} 
             onClose={() => setShowDirectChat(null)} 
+            currentUser={user}
           />
         )}
 
@@ -1625,7 +2089,7 @@ export default function App() {
   );
 }
 
-const CreatePostView = ({ onBack, userProfile }: { onBack: () => void, userProfile: Profile | null }) => {
+const CreatePostView = ({ onBack, userProfile, onSuccess }: { onBack: () => void, userProfile: Profile | null, onSuccess?: () => void }) => {
   const [publishType, setPublishType] = useState<'post' | 'service'>('post');
   const [description, setDescription] = useState('');
   const [province, setProvince] = useState('');
@@ -1693,24 +2157,61 @@ const CreatePostView = ({ onBack, userProfile }: { onBack: () => void, userProfi
             location: `${province}, ${neighborhood}`,
             available_hours: availableHours,
             phone_number: phoneNumber,
+            price: price,
             image_url: imageUrl,
+            images: uploadedUrls,
           });
         if (error) throw error;
+
+        // Notify followers
+        const { data: followers } = await supabase
+          .from('follows')
+          .select('follower_id')
+          .eq('following_id', userProfile.id);
+        
+        if (followers && followers.length > 0) {
+          const notifications = followers.map(f => ({
+            user_id: f.follower_id,
+            type: 'new_post',
+            content: `${userProfile.name} publicou um novo post: ${productName}`,
+            data: { author_id: userProfile.id }
+          }));
+          await supabase.from('notifications').insert(notifications);
+        }
       } else {
         const { error } = await supabase
           .from('services')
           .insert({
             user_id: userProfile.id,
+            provider_id: userProfile.id, // Ensure provider_id is set
             title: productName,
             description: description,
             price: price,
             category: category,
             location: `${province}, ${neighborhood}`,
             image_url: imageUrl,
+            images: uploadedUrls,
           });
         if (error) throw error;
+
+        // Notify followers
+        const { data: followers } = await supabase
+          .from('follows')
+          .select('follower_id')
+          .eq('following_id', userProfile.id);
+        
+        if (followers && followers.length > 0) {
+          const notifications = followers.map(f => ({
+            user_id: f.follower_id,
+            type: 'new_post',
+            content: `${userProfile.name} publicou um novo serviço: ${productName}`,
+            data: { author_id: userProfile.id }
+          }));
+          await supabase.from('notifications').insert(notifications);
+        }
       }
 
+      onSuccess?.();
       onBack();
     } catch (err: any) {
       console.error('Error creating:', err);
@@ -1913,23 +2414,21 @@ const CreatePostView = ({ onBack, userProfile }: { onBack: () => void, userProfi
           />
         </div>
 
-        {/* Preço (apenas para serviços) */}
-        {publishType === 'service' && (
-          <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2 ml-1">
-              <Sparkles size={14} className="text-blue-600" strokeWidth={3} />
-              Preço (Kz)
-            </label>
-            <input 
-              type="text"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="Ex: 5.000"
-              className="w-full bg-gray-50 border border-gray-200 rounded-[3px] p-2.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-              required
-            />
-          </div>
-        )}
+        {/* Preço */}
+        <div className="space-y-1.5">
+          <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2 ml-1">
+            <Sparkles size={14} className="text-blue-600" strokeWidth={3} />
+            Preço (Kz)
+          </label>
+          <input 
+            type="text"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="Ex: 5.000"
+            className="w-full bg-gray-50 border border-gray-200 rounded-[3px] p-2.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+            required
+          />
+        </div>
 
         <button 
           type="submit"
@@ -2274,7 +2773,7 @@ const ProfileView = ({ profile, onLogout, onSettings, onUpdateProfile, userEmail
                   alt="" 
                 />
                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Heart size={20} className="text-white fill-white" />
+                  <ThumbsUp size={20} className="text-white fill-white" />
                 </div>
               </div>
             ))
@@ -2391,7 +2890,7 @@ const ProfileView = ({ profile, onLogout, onSettings, onUpdateProfile, userEmail
   );
 };
 
-const PublicProfileView = ({ profileId, onBack, onPostClick, onCommentClick }: { profileId: string, onBack: () => void, onPostClick?: (post: Post) => void, onCommentClick?: (post: Post) => void }) => {
+const PublicProfileView = ({ profileId, currentUserId, onBack, onPostClick, onCommentClick }: { profileId: string, currentUserId?: string, onBack: () => void, onPostClick?: (post: Post) => void, onCommentClick?: (post: Post) => void }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2472,10 +2971,15 @@ const PublicProfileView = ({ profileId, onBack, onPostClick, onCommentClick }: {
             </div>
 
             <div className="flex items-center gap-3 w-full max-w-sm">
-              <button className="flex-1 bg-blue-600 text-white py-3 rounded-[3px] font-bold text-sm shadow-xl shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2">
-                Seguir
-              </button>
-              <button className="flex-1 bg-gray-900 text-white py-3 rounded-[3px] font-bold text-sm shadow-xl shadow-gray-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+              {currentUserId !== profileId && (
+                <button className="flex-1 bg-blue-600 text-white py-3 rounded-[3px] font-bold text-sm shadow-xl shadow-blue-200 active:scale-95 transition-all flex items-center justify-center gap-2">
+                  Seguir
+                </button>
+              )}
+              <button className={cn(
+                "bg-gray-900 text-white py-3 rounded-[3px] font-bold text-sm shadow-xl shadow-gray-200 active:scale-95 transition-all flex items-center justify-center gap-2",
+                currentUserId === profileId ? "w-full" : "flex-1"
+              )}>
                 Mensagem
               </button>
             </div>
@@ -2520,7 +3024,7 @@ const PublicProfileView = ({ profileId, onBack, onPostClick, onCommentClick }: {
                   alt="" 
                 />
                 <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Heart size={20} className="text-white fill-white" />
+                  <ThumbsUp size={20} className="text-white fill-white" />
                 </div>
               </div>
             ))
@@ -2610,29 +3114,214 @@ const ExploreView = ({ professionals }: { professionals: Profile[] }) => (
   </div>
 );
 
-const NotificationsView = () => (
-  <div className="p-4 space-y-4 animate-in slide-in-from-right-4 duration-500">
-    <h2 className="text-xl font-bold text-gray-900 mb-6">Notificações</h2>
-    {[1, 2, 3, 4].map(i => (
-      <div key={`notif-${i}`} className="bg-white p-4 rounded-[3px] border border-gray-100 flex gap-4 items-start">
-        <div className={cn(
-          "w-10 h-10 rounded-[3px] flex items-center justify-center shrink-0",
-          i % 2 === 0 ? "bg-blue-50 text-blue-600" : "bg-red-50 text-red-500"
-        )}>
-          {i % 2 === 0 ? <CheckCircle2 size={20} /> : <Heart size={20} />}
+const NotificationsView = ({ notifications, loading, onBack, onMarkAllAsRead }: { notifications: any[], loading: boolean, onBack: () => void, onMarkAllAsRead: () => void }) => {
+  const parseContent = (content: string) => {
+    const match = content.match(/^(.*?)( começou a seguir| curtiu| comentou| publicou| compartilhou)(.*)/);
+    if (match) {
+      return { name: match[1], action: match[2] + match[3] };
+    }
+    return { name: 'Usuário', action: content };
+  };
+
+  return (
+    <div className="fixed inset-0 bg-[#eef2f5] z-50 flex flex-col animate-in slide-in-from-right-4 duration-500">
+      {/* Header */}
+      <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm z-10">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="p-1 -ml-1 hover:bg-gray-100 rounded-full transition-colors">
+            <ChevronLeft size={28} strokeWidth={3} className="text-black" />
+          </button>
+          <h1 className="text-[22px] font-bold text-black tracking-tight">Notificações</h1>
         </div>
-        <div className="flex-1">
-          <p className="text-sm text-gray-800">
-            <span className="font-bold">Maria Oliveira</span> {i % 2 === 0 ? 'confirmou o agendamento para amanhã.' : 'curtiu sua publicação.'}
-          </p>
-          <p className="text-[10px] text-gray-400 mt-1">Há {i * 5} minutos</p>
+        <div className="flex items-center gap-2">
+          <button onClick={onMarkAllAsRead} className="w-9 h-9 bg-black rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors">
+            <Check size={20} strokeWidth={3} className="text-white" />
+          </button>
+          <button className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors">
+            <Search size={20} strokeWidth={3} className="text-black" />
+          </button>
         </div>
       </div>
-    ))}
-  </div>
-);
 
-const DirectChatView = ({ userId, onClose }: { userId: string, onClose: () => void }) => {
+      {/* List */}
+      <div className="flex-1 overflow-y-auto pb-20">
+        {loading ? (
+          <div className="py-10 text-center text-gray-500 font-medium">Carregando...</div>
+        ) : notifications.length === 0 ? (
+          <div className="py-10 text-center text-gray-500 font-medium">Nenhuma notificação</div>
+        ) : (
+          notifications.map(notif => {
+            const { name, action } = parseContent(notif.content);
+            
+            let BadgeIcon = Bell;
+            let badgeColor = "bg-blue-500";
+            
+            if (notif.type === 'like') { BadgeIcon = ThumbsUp; badgeColor = "bg-[#0866ff]"; }
+            else if (notif.type === 'comment') { BadgeIcon = MessageCircle; badgeColor = "bg-[#31a24c]"; }
+            else if (notif.type === 'new_post') { BadgeIcon = MessageSquare; badgeColor = "bg-[#0866ff]"; }
+            else if (notif.type === 'follow') { BadgeIcon = UserPlus; badgeColor = "bg-[#0866ff]"; }
+            else if (notif.type === 'share') { BadgeIcon = Share2; badgeColor = "bg-[#0866ff]"; }
+
+            return (
+              <div key={notif.id} className={cn(
+                "px-4 py-3 flex gap-3 items-start transition-colors cursor-pointer",
+                !notif.is_read ? "bg-[#e7f3ff]" : "bg-transparent hover:bg-black/5"
+              )}>
+                <div className="relative shrink-0">
+                  <img 
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`} 
+                    alt={name}
+                    className="w-16 h-16 rounded-full object-cover border border-gray-200"
+                  />
+                  <div className={cn(
+                    "absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center border-[3px] text-white", 
+                    !notif.is_read ? "border-[#e7f3ff]" : "border-[#eef2f5]",
+                    badgeColor
+                  )}>
+                    <BadgeIcon size={12} strokeWidth={3} className="fill-white" />
+                  </div>
+                </div>
+                
+                <div className="flex-1 pt-1">
+                  <p className="text-[15px] text-gray-900 leading-[1.3]">
+                    <span className="font-bold">{name}</span>
+                    {action}
+                  </p>
+                  <p className="text-[13px] text-gray-500 mt-1 font-medium">
+                    {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true, locale: ptBR })}
+                  </p>
+                </div>
+
+                <button className="p-2 text-gray-500 hover:bg-gray-200 rounded-full transition-colors shrink-0 -mr-2">
+                  <MoreHorizontal size={20} />
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DirectChatView = ({ userId, onClose, currentUser }: { userId: string, onClose: () => void, currentUser: any }) => {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [otherUser, setOtherUser] = useState<any>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchOtherUser = async () => {
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (data) setOtherUser(data);
+    };
+    fetchOtherUser();
+  }, [userId]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${currentUser.id})`)
+        .order('created_at', { ascending: true });
+      
+      if (!error && data) {
+        setMessages(data);
+        // Mark as read
+        const unreadIds = data.filter(m => m.receiver_id === currentUser.id && !m.is_read).map(m => m.id);
+        if (unreadIds.length > 0) {
+          await supabase.from('messages').update({ is_read: true }).in('id', unreadIds);
+        }
+      }
+    };
+
+    fetchMessages();
+
+    const channel = supabase
+      .channel(`chat:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${currentUser.id}`
+        },
+        (payload) => {
+          if (payload.new.sender_id === userId) {
+            setMessages(prev => {
+              if (prev.find(m => m.id === payload.new.id)) return prev;
+              return [...prev, payload.new];
+            });
+            // Mark as read
+            supabase.from('messages').update({ is_read: true }).eq('id', payload.new.id).then();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${currentUser.id}`
+        },
+        (payload) => {
+          if (payload.new.receiver_id === userId) {
+            setMessages(prev => {
+              // Avoid duplicates if we already added it optimistically
+              if (prev.find(m => m.id === payload.new.id)) return prev;
+              return [...prev, payload.new];
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, currentUser]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!newMessage.trim() || !currentUser) return;
+
+    const tempId = crypto.randomUUID();
+    const messageData = {
+      id: tempId,
+      sender_id: currentUser.id,
+      receiver_id: userId,
+      content: newMessage.trim(),
+      created_at: new Date().toISOString(),
+      is_read: false
+    };
+
+    // Optimistic update
+    setMessages(prev => [...prev, messageData]);
+    setNewMessage('');
+
+    try {
+      const { error } = await supabase.from('messages').insert([{
+        id: tempId,
+        sender_id: currentUser.id,
+        receiver_id: userId,
+        content: messageData.content
+      }]);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error sending message:', err);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+    }
+  };
+
   return (
     <motion.div 
       initial={{ x: '100%' }}
@@ -2647,22 +3336,35 @@ const DirectChatView = ({ userId, onClose }: { userId: string, onClose: () => vo
         </button>
         <div className="flex items-center gap-3">
           <div className="relative">
-            <img src={`https://ui-avatars.com/api/?name=User&background=0D8ABC&color=fff`} className="w-10 h-10 rounded-full object-cover border border-gray-200" alt="Avatar" />
+            <img src={otherUser?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUser?.name || 'User')}&background=0D8ABC&color=fff`} className="w-10 h-10 rounded-full object-cover border border-gray-200" alt="Avatar" />
             <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
           </div>
           <div>
-            <h2 className="text-base font-bold text-gray-900 leading-tight">Conversa</h2>
+            <h2 className="text-base font-bold text-gray-900 leading-tight">{otherUser?.name || 'Carregando...'}</h2>
             <span className="text-xs text-green-600 font-medium">Online</span>
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-        <div className="text-center text-xs text-gray-400 my-2 font-medium">Hoje</div>
-        <div className="self-start bg-white border border-gray-200 p-3 rounded-2xl rounded-tl-sm max-w-[80%] shadow-sm">
-          <p className="text-sm text-gray-800">Olá! Vi o seu anúncio e tenho interesse. Podemos conversar?</p>
-          <span className="text-[10px] text-gray-400 mt-1 block text-right">14:20</span>
-        </div>
+        {messages.map((msg) => {
+          const isMe = msg.sender_id === currentUser?.id;
+          return (
+            <div key={msg.id} className={cn(
+              "p-3 rounded-2xl max-w-[80%] shadow-sm",
+              isMe ? "self-end bg-blue-600 text-white rounded-tr-sm" : "self-start bg-white border border-gray-200 text-gray-800 rounded-tl-sm"
+            )}>
+              <p className="text-sm">{msg.content}</p>
+              <span className={cn(
+                "text-[10px] mt-1 block text-right",
+                isMe ? "text-blue-200" : "text-gray-400"
+              )}>
+                {new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          );
+        })}
+        <div ref={messagesEndRef} />
       </div>
 
       <div className="p-4 bg-white border-t border-gray-100 flex items-center gap-3 pb-safe">
@@ -2671,10 +3373,17 @@ const DirectChatView = ({ userId, onClose }: { userId: string, onClose: () => vo
         </button>
         <input 
           type="text" 
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           placeholder="Digite uma mensagem..." 
           className="flex-1 bg-gray-100 border-transparent rounded-full px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none" 
         />
-        <button className="bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md shadow-blue-200 active:scale-95 transition-transform shrink-0">
+        <button 
+          onClick={handleSend}
+          disabled={!newMessage.trim()}
+          className="bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md shadow-blue-200 active:scale-95 transition-transform shrink-0 disabled:opacity-50 disabled:active:scale-100"
+        >
           <Send size={18} className="ml-1" />
         </button>
       </div>
@@ -2742,27 +3451,192 @@ const BookingModal = ({ post, onClose }: { post: Post, onClose: () => void }) =>
   );
 };
 
-const ChatView = () => (
-  <div className="p-4 space-y-4 animate-in slide-in-from-right-4 duration-500">
-    <h2 className="text-xl font-bold text-gray-900 mb-6">Mensagens</h2>
-    {[1, 2, 3].map(i => (
-      <div key={`chat-${i}`} className="bg-white p-4 rounded-[3px] border border-gray-100 flex gap-4 items-center cursor-pointer active:bg-gray-50 transition-colors">
-        <div className="relative">
-          <img src={`https://i.pravatar.cc/150?u=chat${i}`} className="w-14 h-14 rounded-[3px] object-cover" alt="Avatar" />
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-[3px]"></span>
-        </div>
-        <div className="flex-1">
-          <div className="flex justify-between items-start mb-1">
-            <h4 className="text-sm font-bold text-gray-900">Carlos Lima</h4>
-            <span className="text-[10px] text-gray-400">14:20</span>
-          </div>
-          <p className="text-xs text-gray-500 line-clamp-1">Olá! Gostaria de saber mais sobre o serviço de pintura...</p>
-        </div>
-        {i === 1 && <div className="w-5 h-5 bg-blue-600 text-white text-[10px] font-bold rounded-[3px] flex items-center justify-center">2</div>}
+const ChatView = ({ currentUser, onChatClick, onBack }: { currentUser: any, onChatClick: (userId: string) => void, onBack: () => void }) => {
+  const [chats, setChats] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const fetchChats = async () => {
+      // Fetch all messages involving the current user
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!sender_id(*), receiver:profiles!receiver_id(*)')
+        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        // Group by the other user
+        const chatMap = new Map();
+        
+        data.forEach(msg => {
+          const otherUserId = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id;
+          const otherUser = msg.sender_id === currentUser.id ? msg.receiver : msg.sender;
+          
+          if (!chatMap.has(otherUserId)) {
+            chatMap.set(otherUserId, {
+              otherUser,
+              lastMessage: msg,
+              unreadCount: msg.receiver_id === currentUser.id && !msg.is_read ? 1 : 0
+            });
+          } else {
+            if (msg.receiver_id === currentUser.id && !msg.is_read) {
+              const chat = chatMap.get(otherUserId);
+              chat.unreadCount += 1;
+            }
+          }
+        });
+
+        setChats(Array.from(chatMap.values()));
+      }
+      setLoading(false);
+    };
+
+    fetchChats();
+
+    const channel = supabase
+      .channel('public:chat_list')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${currentUser.id}`
+        },
+        () => {
+          fetchChats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_id=eq.${currentUser.id}`
+        },
+        () => {
+          fetchChats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser]);
+
+  const filteredChats = chats.filter(chat => {
+    if (filter === 'unread') return chat.unreadCount > 0;
+    return true;
+  });
+
+  const unreadTotal = chats.reduce((acc, chat) => acc + (chat.unreadCount > 0 ? 1 : 0), 0);
+
+  return (
+    <div className="bg-gray-50 min-h-screen text-gray-900 animate-in slide-in-from-right-4 duration-500 pb-20">
+      {/* Header */}
+      <div className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm sticky top-0 z-10">
+        <button onClick={onBack} className="p-1 -ml-1 hover:bg-gray-100 rounded-full transition-colors">
+          <ChevronLeft size={28} strokeWidth={3} className="text-black" />
+        </button>
+        <h1 className="text-[22px] font-bold text-black tracking-tight">Mensagens</h1>
       </div>
-    ))}
-  </div>
-);
+
+      <div className="p-4 bg-white border-b border-gray-100">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <button 
+            onClick={() => setFilter('all')}
+            className={cn(
+              "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+              filter === 'all' ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            )}
+          >
+            Todas
+          </button>
+          <button 
+            onClick={() => setFilter('unread')}
+            className={cn(
+              "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5",
+              filter === 'unread' ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            )}
+          >
+            Não lidas {unreadTotal > 0 && <span className="text-xs bg-white/20 px-1.5 rounded-full">{unreadTotal}</span>}
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-0 bg-white">
+        {loading ? (
+          <div className="py-10 text-center text-gray-400 text-sm">Carregando...</div>
+        ) : filteredChats.length === 0 ? (
+          <div className="py-10 text-center text-gray-400 text-sm">Nenhuma mensagem</div>
+        ) : (
+          filteredChats.map(chat => {
+            const isMe = chat.lastMessage.sender_id === currentUser.id;
+            const isRead = chat.lastMessage.is_read;
+            
+            return (
+              <div 
+                key={chat.otherUser.id} 
+                onClick={() => onChatClick(chat.otherUser.id)}
+                className="px-4 py-3 flex gap-4 items-center cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="relative shrink-0">
+                  <div className={cn(
+                    "w-[52px] h-[52px] rounded-full p-[2px]",
+                    chat.unreadCount > 0 ? "bg-blue-600" : "bg-transparent"
+                  )}>
+                    <img 
+                      src={chat.otherUser.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.otherUser.name)}&background=EBF5FF&color=1D4ED8`} 
+                      className="w-full h-full rounded-full object-cover border-2 border-white" 
+                      alt="Avatar" 
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex-1 min-w-0 border-b border-gray-100 pb-3">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <h4 className="text-[17px] font-bold text-gray-900 truncate pr-2">{chat.otherUser.name}</h4>
+                    <span className={cn(
+                      "text-xs shrink-0 font-medium",
+                      chat.unreadCount > 0 ? "text-blue-600" : "text-gray-400"
+                    )}>
+                      {format(new Date(chat.lastMessage.created_at), 'HH:mm')}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1 min-w-0">
+                      {isMe && (
+                        <CheckCheck size={16} className={cn("shrink-0", isRead ? "text-blue-500" : "text-gray-400")} />
+                      )}
+                      <p className={cn(
+                        "text-[14px] truncate",
+                        chat.unreadCount > 0 ? "text-gray-900 font-medium" : "text-gray-500"
+                      )}>
+                        {chat.lastMessage.content}
+                      </p>
+                    </div>
+                    
+                    {chat.unreadCount > 0 && (
+                      <div className="w-[20px] h-[20px] bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shrink-0">
+                        {chat.unreadCount}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
 
 const SettingsView = ({ onBack }: { onBack: () => void }) => (
   <div className="p-4 animate-in slide-in-from-right-4 duration-500">
@@ -3010,7 +3884,7 @@ const TermsView = ({ onBack }: { onBack: () => void }) => {
         <section>
           <h3 className="text-lg font-black text-blue-600 mb-3 uppercase tracking-tighter">1. Aceitação dos Termos</h3>
           <p className="text-sm text-gray-600 leading-relaxed font-medium">
-            Ao utilizar a plataforma <span className="font-bold text-gray-900">Serviços</span>, você concorda integralmente com as diretrizes aqui estabelecidas. Este ecossistema foi projetado para fomentar conexões profissionais seguras e eficientes entre prestadores e clientes.
+            Ao utilizar a plataforma <span className="font-bold text-gray-900">Boladas</span>, você concorda integralmente com as diretrizes aqui estabelecidas. Este ecossistema foi projetado para fomentar conexões profissionais seguras e eficientes entre prestadores e clientes.
           </p>
         </section>
 
@@ -3036,7 +3910,7 @@ const TermsView = ({ onBack }: { onBack: () => void }) => {
         </section>
 
         <div className="pt-8 border-t border-gray-100 italic text-[10px] text-gray-400 text-center">
-          Última atualização: Abril de 2026. Todos os direitos reservados à plataforma Serviços.
+          Última atualização: Abril de 2026. Todos os direitos reservados à plataforma Boladas.
         </div>
       </div>
     </div>
