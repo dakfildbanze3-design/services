@@ -51,7 +51,10 @@ import {
   LayoutGrid,
   UserPlus,
   CheckCheck,
-  Forward
+  Forward,
+  Info,
+  ThumbsDown,
+  ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -154,6 +157,8 @@ interface Comment {
   content: string;
   parent_id?: string;
   profiles: Profile;
+  likes_count?: number;
+  has_liked?: boolean;
 }
 
 // --- Components ---
@@ -213,13 +218,114 @@ const SplashScreen = ({ onComplete, loading }: { onComplete: () => void, loading
 };
 
 const LoadingOverlay = () => (
-  <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-[100]">
-    <div className="bg-white p-4 rounded-[3px] shadow-xl flex flex-col items-center">
-      <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-      <p className="mt-2 text-sm font-medium text-gray-600">Carregando...</p>
+  <div className="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center p-8">
+    <div className="w-20 h-20 relative mb-8">
+      <motion.div
+        animate={{ 
+          scale: [1, 1.1, 1],
+          opacity: [0.5, 1, 0.5]
+        }}
+        transition={{ 
+          duration: 2,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+        className="absolute inset-0 bg-blue-50 rounded-full"
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <img 
+          src="https://mevdfyahjuxwdfxwqtov.supabase.co/storage/v1/object/public/services/c7f8d6d0-ca82-43cf-934a-32c7f773b611/avatar-1774531380126.jpg" 
+          alt="Logo" 
+          className="w-12 h-12 object-contain"
+          referrerPolicy="no-referrer"
+        />
+      </div>
+      <div className="absolute inset-0 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
     </div>
+    <h2 className="text-xl font-black text-gray-900 mb-2 tracking-tight">Carregando...</h2>
+    <p className="text-sm text-gray-400 font-medium text-center max-w-[200px]">Preparando sua melhor experiência profissional</p>
   </div>
 );
+
+const SuccessToast = ({ message, show, type = 'success' }: { message: string, show: boolean, type?: 'success' | 'error' }) => (
+  <AnimatePresence>
+    {show && (
+      <motion.div
+        initial={{ y: -100, opacity: 0 }}
+        animate={{ y: 20, opacity: 1 }}
+        exit={{ y: -100, opacity: 0 }}
+        className="fixed top-0 left-0 right-0 z-[10000] flex justify-center px-4 pointer-events-none"
+      >
+        <div className={cn(
+          "px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 backdrop-blur-md border",
+          type === 'success' ? "bg-green-500/90 text-white border-green-400" : "bg-red-500/90 text-white border-red-400"
+        )}>
+          {type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
+          <span className="text-sm font-bold">{message}</span>
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+);
+
+const PullToRefresh = ({ onRefresh, refreshing, children }: { onRefresh: () => Promise<void>, refreshing: boolean, children: React.ReactNode }) => {
+  const [pullDistance, setPullDistance] = useState(0);
+  const threshold = 80;
+  const startY = useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      startY.current = e.touches[0].pageY;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (window.scrollY === 0 && !refreshing) {
+      const currentY = e.touches[0].pageY;
+      const distance = currentY - startY.current;
+      if (distance > 0) {
+        setPullDistance(Math.min(distance * 0.4, threshold + 20));
+      }
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (pullDistance >= threshold) {
+      await onRefresh();
+    }
+    setPullDistance(0);
+  };
+
+  return (
+    <div 
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="relative"
+    >
+      <motion.div
+        animate={{ height: pullDistance }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        className="overflow-hidden flex items-center justify-center bg-gray-50/50"
+      >
+        <div className="flex flex-col items-center gap-1">
+          <div className={cn(
+            "w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full",
+            refreshing ? "animate-spin" : ""
+          )} 
+          style={{ 
+            transform: `rotate(${pullDistance * 3}deg)`,
+            opacity: pullDistance / threshold
+          }} />
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+            {pullDistance >= threshold ? "Solte para atualizar" : "Puxe para atualizar"}
+          </span>
+        </div>
+      </motion.div>
+      {children}
+    </div>
+  );
+};
 
 const NavItem = ({ icon: Icon, label, active, onClick }: any) => (
   <button 
@@ -548,17 +654,29 @@ const ServiceCard: React.FC<{ service: Service, onClick: () => void }> = ({ serv
       onClick={onClick}
       className="bg-white rounded-[3px] overflow-hidden border border-[#D1D5DB] cursor-pointer active:scale-[0.98] transition-transform"
     >
-      <div className="aspect-[4/3] relative">
-        <img 
-          src={service.image_url || 'https://picsum.photos/seed/service/400/300'} 
-          className="w-full h-full object-cover"
-          alt={service.title}
-        />
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2 py-1 rounded-[3px] flex items-center gap-1 border border-[#D1D5DB] shadow-sm">
-          <Star size={10} className="text-yellow-500 fill-yellow-500" />
-          <span className="text-[9px] font-bold text-gray-900">{service.rating || '4.8'}</span>
+      {service.image_url ? (
+        <div className="aspect-[4/3] relative">
+          <img 
+            src={service.image_url} 
+            className="w-full h-full object-cover"
+            alt={service.title}
+          />
+          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2 py-1 rounded-[3px] flex items-center gap-1 border border-[#D1D5DB] shadow-sm">
+            <Star size={10} className="text-yellow-500 fill-yellow-500" />
+            <span className="text-[9px] font-bold text-gray-900">{service.rating || '4.8'}</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="aspect-[4/3] bg-blue-50 p-4 flex flex-col justify-center relative">
+          <p className="text-blue-900 font-bold text-xs line-clamp-4 leading-relaxed italic">
+            "{service.description || 'Sem descrição disponível.'}"
+          </p>
+          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2 py-1 rounded-[3px] flex items-center gap-1 border border-[#D1D5DB] shadow-sm">
+            <Star size={10} className="text-yellow-500 fill-yellow-500" />
+            <span className="text-[9px] font-bold text-gray-900">{service.rating || '4.8'}</span>
+          </div>
+        </div>
+      )}
       <div className="p-3">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-[2px] uppercase tracking-wider">
@@ -589,10 +707,57 @@ const ServiceCard: React.FC<{ service: Service, onClick: () => void }> = ({ serv
 const CommentsView = ({ post, onClose, userProfile, onCommentAdded }: { post: Post, onClose: () => void, userProfile: Profile | null, onCommentAdded: (postId: string) => void }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchComments();
+
+    // Set up Realtime subscription for comments
+    const channel = supabase
+      .channel(`comments:${post.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+          filter: `post_id=eq.${post.id}`
+        },
+        async (payload) => {
+          if (payload.eventType === 'INSERT') {
+            // Fetch profile for the new comment
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', payload.new.user_id)
+              .single();
+            
+            const newCommentWithProfile = {
+              ...payload.new,
+              profiles: profileData,
+              likes_count: 0,
+              has_liked: false
+            };
+            
+            setComments(prev => {
+              if (prev.some(c => c.id === newCommentWithProfile.id)) return prev;
+              return [...prev, newCommentWithProfile as Comment];
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setComments(prev => prev.filter(c => c.id !== payload.old.id && c.parent_id !== payload.old.id));
+          } else if (payload.eventType === 'UPDATE') {
+            setComments(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [post.id]);
 
   const fetchComments = async () => {
@@ -604,7 +769,23 @@ const CommentsView = ({ post, onClose, userProfile, onCommentAdded }: { post: Po
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setComments(data || []);
+
+      // If user is logged in, check which comments they liked
+      let commentsWithLikes = data || [];
+      if (userProfile) {
+        const { data: likedData } = await supabase
+          .from('comment_likes')
+          .select('comment_id')
+          .eq('user_id', userProfile.id);
+        
+        const likedIds = new Set(likedData?.map(l => l.comment_id) || []);
+        commentsWithLikes = (data || []).map(c => ({
+          ...c,
+          has_liked: likedIds.has(c.id)
+        }));
+      }
+
+      setComments(commentsWithLikes);
     } catch (err) {
       console.error('Error fetching comments:', err);
     } finally {
@@ -612,38 +793,98 @@ const CommentsView = ({ post, onClose, userProfile, onCommentAdded }: { post: Po
     }
   };
 
+  const handleCommentLike = async (comment: Comment) => {
+    if (!userProfile) return;
+
+    const isLiked = comment.has_liked;
+    
+    // Optimistic update
+    setComments(prev => prev.map(c => 
+      c.id === comment.id 
+        ? { ...c, has_liked: !isLiked, likes_count: (c.likes_count || 0) + (isLiked ? -1 : 1) } 
+        : c
+    ));
+
+    try {
+      if (isLiked) {
+        await supabase
+          .from('comment_likes')
+          .delete()
+          .eq('user_id', userProfile.id)
+          .eq('comment_id', comment.id);
+      } else {
+        await supabase
+          .from('comment_likes')
+          .insert({
+            user_id: userProfile.id,
+            comment_id: comment.id
+          });
+        
+        // Notify comment owner
+        if (comment.user_id !== userProfile.id) {
+          await supabase.from('notifications').insert({
+            user_id: comment.user_id,
+            type: 'like',
+            content: `${userProfile.name} curtiu seu comentário: ${comment.content.substring(0, 30)}...`,
+            data: { post_id: post.id, comment_id: comment.id, user_id: userProfile.id }
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling comment like:', err);
+      // Revert optimistic update on error
+      setComments(prev => prev.map(c => 
+        c.id === comment.id 
+          ? { ...c, has_liked: isLiked, likes_count: (c.likes_count || 0) + (isLiked ? 1 : -1) } 
+          : c
+      ));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !userProfile) return;
+    if (!newComment.trim() || !userProfile || submitting) return;
 
+    setSubmitting(true);
     try {
       const { data, error } = await supabase
         .from('comments')
         .insert({
           post_id: post.id,
           user_id: userProfile.id,
-          content: newComment.trim()
+          content: newComment.trim(),
+          parent_id: replyTo?.id || null
         })
         .select('*, profiles(*)')
         .single();
 
       if (error) throw error;
       
-      // Notify post owner
-      if (post.user_id !== userProfile.id) {
+      // Notify post owner or comment owner
+      const recipientId = replyTo ? replyTo.user_id : post.user_id;
+      if (recipientId !== userProfile.id) {
         await supabase.from('notifications').insert({
-          user_id: post.user_id,
+          user_id: recipientId,
           type: 'comment',
-          content: `${userProfile.name} comentou na sua publicação: ${newComment.trim().substring(0, 30)}${newComment.length > 30 ? '...' : ''}`,
+          content: `${userProfile.name} ${replyTo ? 'respondeu seu comentário' : 'comentou na sua publicação'}: ${newComment.trim().substring(0, 30)}${newComment.length > 30 ? '...' : ''}`,
           data: { post_id: post.id, comment_id: data.id, user_id: userProfile.id }
         });
       }
 
-      setComments([...comments, data]);
+      // Realtime will handle the state update, but we can add it here for instant feedback
+      setComments(prev => {
+        if (prev.some(c => c.id === data.id)) return prev;
+        return [...prev, { ...data, likes_count: 0, has_liked: false }];
+      });
+      
       setNewComment('');
+      setReplyTo(null);
       onCommentAdded(post.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error adding comment:', err);
+      alert(`Erro ao enviar comentário: ${err.message || 'Verifique sua conexão ou tente novamente.'}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -655,11 +896,22 @@ const CommentsView = ({ post, onClose, userProfile, onCommentAdded }: { post: Po
         .eq('id', commentId);
 
       if (error) throw error;
-      setComments(comments.filter(c => c.id !== commentId));
+      setComments(comments.filter(c => c.id !== commentId && c.parent_id !== commentId));
     } catch (err) {
       console.error('Error deleting comment:', err);
     }
   };
+
+  const handleReply = (threadParent: Comment, profileToMention?: Profile) => {
+    setReplyTo(threadParent);
+    const mention = profileToMention || threadParent.profiles;
+    setNewComment(`@${mention?.name?.toLowerCase().replace(/\s/g, '')} `);
+    inputRef.current?.focus();
+  };
+
+  // Group comments by parent_id
+  const mainComments = comments.filter(c => !c.parent_id);
+  const getReplies = (parentId: string) => comments.filter(c => c.parent_id === parentId);
 
   return (
     <motion.div 
@@ -669,81 +921,205 @@ const CommentsView = ({ post, onClose, userProfile, onCommentAdded }: { post: Po
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       className="fixed inset-0 bg-white z-[70] flex flex-col"
     >
-      <div className="p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
-        <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
-          <MessageSquare size={20} />
-          Comentários
-        </h2>
-        <button onClick={onClose} className="p-2 -mr-2 text-gray-400 hover:bg-gray-50 rounded-[3px] transition-colors">
-          <X size={24} />
-        </button>
+      {/* Drag Handle */}
+      <div className="w-full flex justify-center pt-2 pb-1">
+        <div className="w-10 h-1 bg-gray-200 rounded-full" />
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-6">
+      <div className="px-4 py-2 border-b border-gray-50 flex items-center justify-between sticky top-0 bg-white z-10">
+        <h2 className="text-lg font-bold text-gray-900">
+          Comentários
+        </h2>
+        <div className="flex items-center gap-2">
+          <button className="p-2 text-gray-400 hover:bg-gray-50 rounded-full transition-colors">
+            <Info size={20} />
+          </button>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:bg-gray-50 rounded-full transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-32 space-y-8">
         {loading ? (
           <div className="flex justify-center py-10">
             <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
           </div>
-        ) : comments.length === 0 ? (
+        ) : mainComments.length === 0 ? (
           <div className="text-center py-10">
             <MessageSquare size={48} className="mx-auto text-gray-200 mb-2" />
             <p className="text-gray-500 font-medium">Nenhum comentário ainda.</p>
             <p className="text-xs text-gray-400">Seja o primeiro a comentar!</p>
           </div>
         ) : (
-          comments.map(comment => (
-            <div key={comment.id} className="flex gap-3">
-              <img 
-                src={comment.profiles?.photoUrl || `https://ui-avatars.com/api/?name=${comment.profiles?.name || 'Usuario'}`} 
-                className="w-8 h-8 rounded-[3px] object-cover"
-                alt={comment.profiles?.name || 'Usuario'}
-              />
-              <div className="flex-1">
-                <div className="bg-gray-50 p-3 rounded-[3px] rounded-tl-none border border-gray-100">
-                  <h4 className="text-xs font-bold text-gray-900 mb-1">{comment.profiles?.name || 'Usuario'}</h4>
-                  <p className="text-sm text-gray-700 font-medium">{comment.content}</p>
-                </div>
-                <div className="flex items-center gap-4 mt-1.5 ml-1">
-                  <span className="text-[10px] font-bold text-gray-400">
-                    {formatDistanceToNow(new Date(comment.created_at), { locale: ptBR })}
-                  </span>
-                  {(userProfile?.id === comment.user_id || userProfile?.id === post.user_id) && (
-                    <button 
-                      onClick={() => handleDelete(comment.id)}
-                      className="text-[10px] text-red-500 font-bold rounded-[3px] px-1.5 py-0.5 hover:bg-red-50 transition-colors"
-                    >
-                      Excluir
-                    </button>
+          mainComments.map(comment => (
+            <div key={comment.id} className="space-y-6">
+              {/* Main Comment */}
+              <div className="flex gap-3 group">
+                <div className="flex flex-col items-center">
+                  <img 
+                    src={comment.profiles?.photoUrl || `https://ui-avatars.com/api/?name=${comment.profiles?.name || 'Usuario'}&background=random`} 
+                    className="w-10 h-10 rounded-full object-cover border border-gray-100 shadow-sm"
+                    alt={comment.profiles?.name || 'Usuario'}
+                  />
+                  {getReplies(comment.id).length > 0 && (
+                    <div className="w-[1.5px] flex-1 bg-gray-100 my-2 rounded-full" />
                   )}
                 </div>
+                <div className="flex-1 pt-0.5">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] font-bold text-gray-900 leading-none">
+                        {comment.profiles?.name || 'Usuário'}
+                      </span>
+                      <span className="text-[11px] text-gray-400 font-medium leading-none">
+                        • {formatDistanceToNow(new Date(comment.created_at), { locale: ptBR }).replace('aproximadamente ', '').replace('cerca de ', '')}
+                      </span>
+                    </div>
+                    {(userProfile?.id === comment.user_id || userProfile?.id === post.user_id) && (
+                      <button 
+                        onClick={() => handleDelete(comment.id)}
+                        className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-50 hover:text-red-500 rounded-full"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                  
+                  <p className="text-[14px] text-gray-700 leading-relaxed mb-3 font-medium">
+                    {comment.content}
+                  </p>
+
+                  <div className="flex items-center gap-6">
+                    <button 
+                      onClick={() => handleCommentLike(comment)}
+                      className={cn(
+                        "flex items-center gap-1.5 transition-all active:scale-90",
+                        comment.has_liked ? "text-blue-600" : "text-gray-500 hover:text-blue-600"
+                      )}
+                    >
+                      <ThumbsUp size={16} fill={comment.has_liked ? "currentColor" : "none"} />
+                      <span className="text-[11px] font-bold">{comment.likes_count || 0}</span>
+                    </button>
+                    <button className="text-gray-500 hover:text-red-500 transition-all active:scale-90">
+                      <ThumbsDown size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleReply(comment)}
+                      className="flex items-center gap-1.5 text-gray-500 hover:text-blue-600 transition-all active:scale-90"
+                    >
+                      <MessageCircle size={16} />
+                      <span className="text-[11px] font-bold">Responder</span>
+                    </button>
+                  </div>
+                </div>
               </div>
+
+              {/* Replies */}
+              {getReplies(comment.id).map(reply => (
+                <div key={reply.id} className="flex gap-3 group ml-12">
+                  <div className="flex flex-col items-center">
+                    <img 
+                      src={reply.profiles?.photoUrl || `https://ui-avatars.com/api/?name=${reply.profiles?.name || 'Usuario'}&background=random`} 
+                      className="w-8 h-8 rounded-full object-cover border border-gray-100 shadow-sm"
+                      alt={reply.profiles?.name || 'Usuario'}
+                    />
+                  </div>
+                  <div className="flex-1 pt-0.5">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-bold text-gray-900 leading-none">
+                          {reply.profiles?.name || 'Usuário'}
+                        </span>
+                        <span className="text-[10px] text-gray-400 font-medium leading-none">
+                          • {formatDistanceToNow(new Date(reply.created_at), { locale: ptBR }).replace('aproximadamente ', '').replace('cerca de ', '')}
+                        </span>
+                      </div>
+                      {(userProfile?.id === reply.user_id || userProfile?.id === post.user_id) && (
+                        <button 
+                          onClick={() => handleDelete(reply.id)}
+                          className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-50 hover:text-red-500 rounded-full"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
+                    
+                    <p className="text-[13px] text-gray-700 leading-relaxed mb-2 font-medium">
+                      {reply.content}
+                    </p>
+
+                    <div className="flex items-center gap-5">
+                      <button 
+                        onClick={() => handleCommentLike(reply)}
+                        className={cn(
+                          "flex items-center gap-1 transition-all active:scale-90",
+                          reply.has_liked ? "text-blue-600" : "text-gray-500 hover:text-blue-600"
+                        )}
+                      >
+                        <ThumbsUp size={14} fill={reply.has_liked ? "currentColor" : "none"} />
+                        <span className="text-[10px] font-bold">{reply.likes_count || 0}</span>
+                      </button>
+                      <button className="text-gray-500 hover:text-red-500 transition-all active:scale-90">
+                        <ThumbsDown size={14} />
+                      </button>
+                      <button 
+                        onClick={() => handleReply(comment, reply.profiles)}
+                        className="flex items-center gap-1 text-gray-500 hover:text-blue-600 transition-all active:scale-90"
+                      >
+                        <MessageCircle size={14} />
+                        <span className="text-[10px] font-bold">Responder</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ))
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="fixed bottom-0 left-0 right-0 p-4 border-t border-gray-100 flex items-center gap-3 bg-white z-20 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-        <img 
-          src={userProfile?.photoUrl || `https://ui-avatars.com/api/?name=${userProfile?.name}`} 
-          className="w-10 h-10 rounded-[3px] object-cover"
-          alt="Seu avatar"
-        />
-        <div className="flex-1 relative">
-          <input 
-            type="text"
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Adicione um comentário..."
-            className="w-full bg-gray-50 border border-gray-200 rounded-[3px] py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+      {/* Input Area */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 border-t border-gray-50 bg-white z-20 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        {replyTo && (
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 rounded-t-xl mb-2 -mx-4 -mt-4 border-b border-gray-100">
+            <span className="text-xs text-gray-500">
+              Respondendo a <span className="font-bold">@{replyTo.profiles?.name?.toLowerCase().replace(/\s/g, '')}</span>
+            </span>
+            <button onClick={() => { setReplyTo(null); setNewComment(''); }} className="text-gray-400 p-1">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        <div className="flex items-center gap-3 max-w-xl mx-auto">
+          <img 
+            src={userProfile?.photoUrl || `https://ui-avatars.com/api/?name=${userProfile?.name}`} 
+            className="w-9 h-9 rounded-full object-cover border border-gray-100"
+            alt="Seu avatar"
           />
+          <form onSubmit={handleSubmit} className="flex-1 relative">
+            <input 
+              ref={inputRef}
+              type="text"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder={replyTo ? "Escreva uma resposta..." : "Adicione um comentário..."}
+              disabled={submitting}
+              maxLength={500}
+              className="w-full bg-gray-100 border-none rounded-full py-2.5 px-5 text-[14px] font-medium focus:ring-2 focus:ring-blue-500/20 outline-none transition-all disabled:opacity-50"
+            />
+            {newComment.trim() && (
+              <button 
+                type="submit"
+                disabled={submitting}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 font-bold text-xs px-3 py-1.5 disabled:opacity-50"
+              >
+                {submitting ? "..." : "Publicar"}
+              </button>
+            )}
+          </form>
         </div>
-        <button 
-          disabled={!newComment.trim()}
-          className="bg-blue-600 text-white font-bold text-sm disabled:opacity-50 rounded-[3px] px-4 py-3 hover:bg-blue-700 transition-colors active:scale-95 flex items-center justify-center"
-        >
-          <Send size={18} />
-        </button>
-      </form>
+      </div>
     </motion.div>
   );
 };
@@ -1078,6 +1454,8 @@ export default function App() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshStatus, setRefreshStatus] = useState<{ show: boolean, message: string, type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const [posts, setPosts] = useState<Post[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [professionals, setProfessionals] = useState<Profile[]>([]);
@@ -1192,6 +1570,32 @@ export default function App() {
     }
   }, []);
 
+  const handleRefresh = useCallback(async () => {
+    if (!navigator.onLine) {
+      setRefreshStatus({ show: true, message: 'Sem conexão com a internet', type: 'error' });
+      setTimeout(() => setRefreshStatus(prev => ({ ...prev, show: false })), 3000);
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        fetchPosts(),
+        fetchServices(),
+        fetchProfessionals(),
+        user ? fetchNotifications() : Promise.resolve(),
+        user ? fetchProfile(user.id) : Promise.resolve()
+      ]);
+      setRefreshStatus({ show: true, message: 'Atualizado com sucesso', type: 'success' });
+    } catch (err) {
+      console.error('Error refreshing:', err);
+      setRefreshStatus({ show: true, message: 'Erro ao atualizar dados', type: 'error' });
+    } finally {
+      setIsRefreshing(false);
+      setTimeout(() => setRefreshStatus(prev => ({ ...prev, show: false })), 3000);
+    }
+  }, [user, fetchProfile]);
+
   // Auth Listener
   useEffect(() => {
     if (authInitialized.current) return;
@@ -1207,14 +1611,14 @@ export default function App() {
           const { data: { user }, error: userError } = await supabase.auth.getUser();
           if (user) {
             setUser(user);
-            await fetchProfile(user.id, user.user_metadata);
+            fetchProfile(user.id, user.user_metadata);
           } else {
             setUser(null);
             setProfile(null);
           }
         } else if (session.user) {
           setUser(session.user);
-          await fetchProfile(session.user.id, session.user.user_metadata);
+          fetchProfile(session.user.id, session.user.user_metadata);
         }
       } catch (err) {
         console.error('Auth initialization error:', err);
@@ -1283,6 +1687,48 @@ export default function App() {
     fetchPosts();
     fetchServices();
     fetchProfessionals();
+
+    // Set up Realtime subscription for posts (to update likes and comments count)
+    const postsChannel = supabase
+      .channel('public:posts')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'posts'
+        },
+        (payload) => {
+          setPosts(prev => prev.map(p => {
+            if (p.id === payload.new.id) {
+              return {
+                ...p,
+                likes_count: payload.new.likes_count,
+                comments_count: payload.new.comments_count,
+                shares_count: payload.new.shares_count
+              };
+            }
+            return p;
+          }));
+          
+          setSelectedPost(prev => {
+            if (prev && prev.id === payload.new.id) {
+              return {
+                ...prev,
+                likes_count: payload.new.likes_count,
+                comments_count: payload.new.comments_count,
+                shares_count: payload.new.shares_count
+              };
+            }
+            return prev;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(postsChannel);
+    };
   }, [user?.id]);
 
   useEffect(() => {
@@ -1494,12 +1940,14 @@ export default function App() {
 
       await supabase.rpc('increment_shares', { post_id: postId });
       
-      await createNotification(
-        post.user_id,
-        'share',
-        postId,
-        `${profile?.name || 'Alguém'} compartilhou sua publicação!`
-      );
+      if (post.user_id !== user.id) {
+        await createNotification(
+          post.user_id,
+          'share',
+          `${profile?.name || 'Alguém'} compartilhou sua publicação!`,
+          { post_id: postId, user_id: user.id }
+        );
+      }
     } catch (err) {
       console.error('Error sharing:', err);
     }
@@ -1816,7 +2264,8 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-xl mx-auto pb-24">
-        {view === 'feed' && (
+        <PullToRefresh onRefresh={handleRefresh} refreshing={isRefreshing}>
+          {view === 'feed' && (
           <div className="animate-in fade-in duration-500">
             <div className="space-y-0">
               {posts.map(post => (
@@ -2017,7 +2466,14 @@ export default function App() {
         )}
         {view === 'settings' && <SettingsScreen onBack={handleBackToProfile} />}
         {view === 'terms' && <TermsView onBack={() => setView('feed')} />}
+        </PullToRefresh>
       </main>
+
+      <SuccessToast 
+        show={refreshStatus.show} 
+        message={refreshStatus.message} 
+        type={refreshStatus.type} 
+      />
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t-[2.5px] border-[#D1D5DB] px-2 py-1 flex items-center justify-around z-40 safe-area-bottom">
@@ -2898,23 +3354,22 @@ const PublicProfileView = ({ profileId, currentUserId, onBack, onPostClick, onCo
   useEffect(() => {
     const fetchPublicProfile = async () => {
       try {
-        const { data: profData, error: profError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', profileId)
-          .single();
+        const [profRes, postsRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', profileId)
+            .single(),
+          supabase
+            .from('posts')
+            .select('*, profiles(*)')
+            .eq('user_id', profileId)
+            .order('created_at', { ascending: false })
+        ]);
 
-        if (profError) throw profError;
-        setProfile(profData);
-
-        const { data: postsData, error: postsError } = await supabase
-          .from('posts')
-          .select('*, profiles(*)')
-          .eq('user_id', profileId)
-          .order('created_at', { ascending: false });
-
-        if (postsError) throw postsError;
-        setPosts(postsData || []);
+        if (profRes.error) throw profRes.error;
+        setProfile(profRes.data);
+        setPosts(postsRes.data || []);
       } catch (err) {
         console.error('Error fetching public profile:', err);
       } finally {
@@ -2927,8 +3382,9 @@ const PublicProfileView = ({ profileId, currentUserId, onBack, onPostClick, onCo
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest animate-pulse">Carregando Perfil...</p>
       </div>
     );
   }

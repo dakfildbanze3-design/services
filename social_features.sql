@@ -25,6 +25,7 @@ ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS available_hours TEXT;
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS phone_number TEXT;
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS shares_count INTEGER DEFAULT 0;
 ALTER TABLE public.posts ADD COLUMN IF NOT EXISTS images TEXT[] DEFAULT '{}';
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES public.comments(id) ON DELETE CASCADE;
 
 -- 2. Likes table
 CREATE TABLE IF NOT EXISTS public.likes (
@@ -179,9 +180,9 @@ CREATE OR REPLACE FUNCTION public.handle_like_change()
 RETURNS TRIGGER AS $$
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        UPDATE public.posts SET likes_count = likes_count + 1 WHERE id = NEW.post_id;
+        UPDATE public.posts SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = NEW.post_id;
     ELSIF (TG_OP = 'DELETE') THEN
-        UPDATE public.posts SET likes_count = likes_count - 1 WHERE id = OLD.post_id;
+        UPDATE public.posts SET likes_count = GREATEST(0, COALESCE(likes_count, 0) - 1) WHERE id = OLD.post_id;
     END IF;
     RETURN NULL;
 END;
@@ -196,9 +197,9 @@ CREATE OR REPLACE FUNCTION public.handle_comment_change()
 RETURNS TRIGGER AS $$
 BEGIN
     IF (TG_OP = 'INSERT') THEN
-        UPDATE public.posts SET comments_count = comments_count + 1 WHERE id = NEW.post_id;
+        UPDATE public.posts SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = NEW.post_id;
     ELSIF (TG_OP = 'DELETE') THEN
-        UPDATE public.posts SET comments_count = comments_count - 1 WHERE id = OLD.post_id;
+        UPDATE public.posts SET comments_count = GREATEST(0, COALESCE(comments_count, 0) - 1) WHERE id = OLD.post_id;
     END IF;
     RETURN NULL;
 END;
@@ -207,6 +208,16 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER on_comment_change
 AFTER INSERT OR DELETE ON public.comments
 FOR EACH ROW EXECUTE FUNCTION public.handle_comment_change();
+
+-- Function to increment shares
+CREATE OR REPLACE FUNCTION public.increment_shares(post_id UUID)
+RETURNS void AS $$
+BEGIN
+  UPDATE public.posts
+  SET shares_count = COALESCE(shares_count, 0) + 1
+  WHERE id = post_id;
+END;
+$$ LANGUAGE plpgsql;
 
 -- Trigger for followers_count
 CREATE OR REPLACE FUNCTION public.handle_follower_change()
@@ -274,17 +285,38 @@ CREATE POLICY "Follows are viewable by everyone" ON public.follows FOR SELECT US
 CREATE POLICY "Users can follow others" ON public.follows FOR INSERT WITH CHECK (auth.uid() = follower_id);
 CREATE POLICY "Users can unfollow others" ON public.follows FOR DELETE USING (auth.uid() = follower_id);
 
--- Add basic policies for other tables
-CREATE POLICY "Bookings are viewable by owner" ON public.bookings FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Services are viewable by everyone" ON public.services FOR SELECT USING (true);
-CREATE POLICY "Conversations are viewable by participants" ON public.conversations FOR SELECT USING (auth.uid() = ANY(participant_ids));
-CREATE POLICY "Messages are viewable by participants" ON public.messages FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.conversations WHERE id = conversation_id AND auth.uid() = ANY(participant_ids))
+-- 13. Comment Likes
+CREATE TABLE IF NOT EXISTS public.comment_likes (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    comment_id UUID REFERENCES public.comments(id) ON DELETE CASCADE NOT NULL,
+    UNIQUE(user_id, comment_id)
 );
-CREATE POLICY "Notifications are viewable by owner" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "FAQ is viewable by everyone" ON public.faq FOR SELECT USING (true);
-CREATE POLICY "Legal is viewable by everyone" ON public.legal FOR SELECT USING (true);
-CREATE POLICY "Settings are viewable by owner" ON public.user_settings FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Privacy is viewable by owner" ON public.user_privacy FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Verifications are viewable by owner" ON public.verifications FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Reports are viewable by admin" ON public.reports FOR SELECT USING (true); -- Simplified
+
+-- Add likes_count to comments
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS likes_count INTEGER DEFAULT 0;
+
+-- Trigger for comment_likes_count
+CREATE OR REPLACE FUNCTION public.handle_comment_like_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        UPDATE public.comments SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = NEW.comment_id;
+    ELSIF (TG_OP = 'DELETE') THEN
+        UPDATE public.comments SET likes_count = GREATEST(0, COALESCE(likes_count, 0) - 1) WHERE id = OLD.comment_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS on_comment_like_change ON public.comment_likes;
+CREATE TRIGGER on_comment_like_change
+AFTER INSERT OR DELETE ON public.comment_likes
+FOR EACH ROW EXECUTE FUNCTION public.handle_comment_like_change();
+
+-- 14. RLS for comment_likes
+ALTER TABLE public.comment_likes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Comment likes are viewable by everyone" ON public.comment_likes FOR SELECT USING (true);
+CREATE POLICY "Users can like comments" ON public.comment_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can unlike comments" ON public.comment_likes FOR DELETE USING (auth.uid() = user_id);
